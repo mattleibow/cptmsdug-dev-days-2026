@@ -46,7 +46,7 @@
     }
 
     <ul class="task-list">
-        @foreach (var task in tasks)
+        @foreach (var task in VisibleTasks)
         {
             <li class="task-row" @key="task">
                 <div class="task-copy">
@@ -63,6 +63,25 @@
             </li>
         }
     </ul>
+    @if (!VisibleTasks.Any())
+    {
+        <p class="empty-tasks" role="status">No @(currentFilter == TaskFilter.Active ? "active" : "completed") tasks yet.</p>
+    }
+
+    <div class="task-filters" role="group" aria-label="Filter tasks">
+        <button type="button"
+                class="@FilterClass(TaskFilter.All)"
+                aria-pressed="@(currentFilter == TaskFilter.All ? "true" : "false")"
+                @onclick="() => SetFilter(TaskFilter.All)">All</button>
+        <button type="button"
+                class="@FilterClass(TaskFilter.Active)"
+                aria-pressed="@(currentFilter == TaskFilter.Active ? "true" : "false")"
+                @onclick="() => SetFilter(TaskFilter.Active)">Active</button>
+        <button type="button"
+                class="@FilterClass(TaskFilter.Completed)"
+                aria-pressed="@(currentFilter == TaskFilter.Completed ? "true" : "false")"
+                @onclick="() => SetFilter(TaskFilter.Completed)">Completed</button>
+    </div>
 </section>
 
 @code {
@@ -77,6 +96,15 @@
     private bool hasTitleError;
     private string newTitle = string.Empty;
     private string newDetails = string.Empty;
+    private TaskFilter currentFilter = TaskFilter.All;
+
+    private IEnumerable<TaskItem> VisibleTasks => tasks.Where(task =>
+        currentFilter == TaskFilter.All || task.IsComplete == (currentFilter == TaskFilter.Completed));
+
+    private string FilterClass(TaskFilter filter) =>
+        currentFilter == filter ? "filter-button selected" : "filter-button";
+
+    private void SetFilter(TaskFilter filter) => currentFilter = filter;
 
     private void ToggleForm()
     {
@@ -110,5 +138,12 @@
         public string Title { get; } = title;
         public string Details { get; } = details;
         public bool IsComplete { get; set; } = isComplete;
+    }
+
+    private enum TaskFilter
+    {
+        All,
+        Active,
+        Completed
     }
 }

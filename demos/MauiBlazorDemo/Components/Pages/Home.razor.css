@@ -142,3 +142,44 @@
     accent-color: #285ae8;
     cursor: pointer;
 }
+
+.empty-tasks {
+    margin: 1rem 0;
+    color: #63738b;
+}
+
+.task-filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 1.5rem;
+    overflow: hidden;
+    border: 1px solid #bdc8d8;
+    border-radius: 0.5rem;
+}
+
+.filter-button {
+    min-height: 3rem;
+    padding: 0.5rem;
+    border: 0;
+    background: #fff;
+    color: #273449;
+    font-weight: 600;
+}
+
+.filter-button + .filter-button {
+    border-left: 1px solid #bdc8d8;
+}
+
+.filter-button.selected {
+    background: #285ae8;
+    color: #fff;
+}
+
+.filter-button:not(.selected):hover {
+    background: #edf2ff;
+}
+
+.filter-button:focus-visible {
+    outline: 3px solid #273449;
+    outline-offset: -4px;
+}

@@ -1,0 +1,144 @@
+.task-page {
+    max-width: 680px;
+    margin: 1.5rem auto 3rem;
+    color: #273449;
+}
+
+.task-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.task-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+
+.task-subtitle {
+    color: #63738b;
+    margin: 0;
+}
+
+.add-task-button {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border: 2px solid #285ae8;
+    border-radius: 0.5rem;
+    background: #fff;
+    color: #285ae8;
+}
+
+.add-task-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+.add-task-button:hover {
+    background: #edf2ff;
+}
+
+.add-task-button:focus-visible,
+.task-checkbox:focus-visible {
+    outline: 3px solid #285ae8;
+    outline-offset: 3px;
+}
+
+.add-task-form {
+    display: grid;
+    gap: 0.65rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #bdc8d8;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.add-task-form h2 {
+    font-size: 1.25rem;
+    margin: 0 0 0.5rem;
+}
+
+.add-task-form label {
+    font-weight: 600;
+}
+
+.add-task-form input {
+    width: 100%;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #98a8bd;
+    border-radius: 0.4rem;
+}
+
+.add-task-form input:focus-visible {
+    outline: 2px solid #285ae8;
+    outline-offset: 1px;
+}
+
+.task-error {
+    color: #b42318;
+    margin: 0;
+}
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.task-list {
+    display: grid;
+    gap: 1rem;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.task-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 5.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #bdc8d8;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.task-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.task-copy h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.3rem;
+}
+
+.task-copy p {
+    font-size: 0.9rem;
+    color: #63738b;
+    margin: 0;
+}
+
+.task-checkbox {
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: 0;
+    accent-color: #285ae8;
+    cursor: pointer;
+}

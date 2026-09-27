@@ -1,5 +1,114 @@
-﻿@page "/"
+@page "/"
 
-<h1>Hello, world!</h1>
+<section class="task-page" aria-labelledby="tasks-heading">
+    <header class="task-header">
+        <div>
+            <h1 id="tasks-heading">My tasks</h1>
+            <p class="task-subtitle" role="status" aria-live="polite">@tasks.Count(task => task.IsComplete) of @tasks.Count tasks complete</p>
+        </div>
+        <button type="button"
+                class="add-task-button"
+                aria-label="@(showAddForm ? "Close add-task form" : "Add task")"
+                aria-expanded="@showAddForm"
+                @onclick="ToggleForm">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 4v16M4 12h16" />
+            </svg>
+        </button>
+    </header>
 
-Welcome to your new app.
+    @if (showAddForm)
+    {
+        <form class="add-task-form" @onsubmit="AddTask" @onsubmit:preventDefault>
+            <h2>Add a task</h2>
+            <label for="task-title">Task title</label>
+            <input id="task-title"
+                   type="text"
+                   maxlength="100"
+                   required
+                   @bind="newTitle"
+                   @bind:event="oninput" />
+            <label for="task-details">Details (optional)</label>
+            <input id="task-details"
+                   type="text"
+                   maxlength="200"
+                   @bind="newDetails"
+                   @bind:event="oninput" />
+            @if (hasTitleError)
+            {
+                <p class="task-error" role="alert">Enter a task title.</p>
+            }
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save task</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="ToggleForm">Cancel</button>
+            </div>
+        </form>
+    }
+
+    <ul class="task-list">
+        @foreach (var task in tasks)
+        {
+            <li class="task-row" @key="task">
+                <div class="task-copy">
+                    <h2>@task.Title</h2>
+                    @if (!string.IsNullOrEmpty(task.Details))
+                    {
+                        <p>@task.Details</p>
+                    }
+                </div>
+                <input type="checkbox"
+                       class="task-checkbox"
+                       @bind="task.IsComplete"
+                       aria-label="@($"Mark {task.Title} as {(task.IsComplete ? "incomplete" : "complete")}")" />
+            </li>
+        }
+    </ul>
+</section>
+
+@code {
+    private readonly List<TaskItem> tasks =
+    [
+        new("Plan the week", "Set priorities for the days ahead", true),
+        new("Review project notes", "Catch up on the latest updates"),
+        new("Share an update", "Let the team know what's next")
+    ];
+
+    private bool showAddForm;
+    private bool hasTitleError;
+    private string newTitle = string.Empty;
+    private string newDetails = string.Empty;
+
+    private void ToggleForm()
+    {
+        showAddForm = !showAddForm;
+        if (!showAddForm)
+        {
+            newTitle = string.Empty;
+            newDetails = string.Empty;
+            hasTitleError = false;
+        }
+    }
+
+    private void AddTask()
+    {
+        var title = newTitle.Trim();
+        if (title.Length == 0)
+        {
+            hasTitleError = true;
+            return;
+        }
+
+        tasks.Add(new TaskItem(title, newDetails.Trim()));
+        showAddForm = false;
+        newTitle = string.Empty;
+        newDetails = string.Empty;
+        hasTitleError = false;
+    }
+
+    private sealed class TaskItem(string title, string details, bool isComplete = false)
+    {
+        public string Title { get; } = title;
+        public string Details { get; } = details;
+        public bool IsComplete { get; set; } = isComplete;
+    }
+}

@@ -1,0 +1,23 @@
+{
+  "width": 1200,
+  "height": 800,
+  "strokes": [
+    {"tool":"pen","color":"#1F2937","size":4,"points":[{"x":245,"y":70},{"x":965,"y":70},{"x":965,"y":730},{"x":245,"y":730},{"x":245,"y":70}]},
+    {"tool":"pen","color":"#1F2937","size":5,"points":[{"x":300,"y":145},{"x":590,"y":145}]},
+    {"tool":"pen","color":"#64748B","size":3,"points":[{"x":300,"y":175},{"x":650,"y":175}]},
+    {"tool":"pen","color":"#2563EB","size":5,"points":[{"x":790,"y":115},{"x":905,"y":115},{"x":905,"y":185},{"x":790,"y":185},{"x":790,"y":115}]},
+    {"tool":"pen","color":"#2563EB","size":4,"points":[{"x":849,"y":131},{"x":849,"y":169}]},
+    {"tool":"pen","color":"#2563EB","size":4,"points":[{"x":830,"y":150},{"x":868,"y":150}]},
+    {"tool":"pen","color":"#1F2937","size":3,"points":[{"x":300,"y":240},{"x":910,"y":240},{"x":910,"y":333},{"x":300,"y":333},{"x":300,"y":240}]},
+    {"tool":"pen","color":"#64748B","size":4,"points":[{"x":330,"y":273},{"x":600,"y":273}]},
+    {"tool":"pen","color":"#64748B","size":3,"points":[{"x":330,"y":301},{"x":460,"y":301}]},
+    {"tool":"pen","color":"#1F2937","size":3,"points":[{"x":300,"y":353},{"x":910,"y":353},{"x":910,"y":446},{"x":300,"y":446},{"x":300,"y":353}]},
+    {"tool":"pen","color":"#64748B","size":4,"points":[{"x":330,"y":386},{"x":670,"y":386}]},
+    {"tool":"pen","color":"#64748B","size":3,"points":[{"x":330,"y":414},{"x":510,"y":414}]},
+    {"tool":"pen","color":"#1F2937","size":3,"points":[{"x":300,"y":466},{"x":910,"y":466},{"x":910,"y":559},{"x":300,"y":559},{"x":300,"y":466}]},
+    {"tool":"pen","color":"#64748B","size":4,"points":[{"x":330,"y":499},{"x":630,"y":499}]},
+    {"tool":"pen","color":"#64748B","size":3,"points":[{"x":330,"y":527},{"x":470,"y":527}]},
+    {"tool":"pen","color":"#2563EB","size":4,"points":[{"x":850,"y":281},{"x":870,"y":303},{"x":905,"y":259}]}
+  ],
+  "notes": "Task list screen: a title and subtitle at top, blue plus button opens an add-task form, three bordered task rows with titles and supporting text, and a blue checkmark on the first completed task. Implement add task and toggle completion using the existing app style."
+}

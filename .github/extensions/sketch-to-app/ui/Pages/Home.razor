@@ -1,0 +1,505 @@
+@page "/"
+@using SkiaSharp
+@using SkiaSharp.Views.Blazor
+@using SketchToApp.Web.Models
+@using SketchToApp.Web.Services
+@implements IAsyncDisposable
+@inject BoardApi Api
+@inject IJSRuntime JS
+
+<PageTitle>Sketch to app</PageTitle>
+
+<header class="app-header">
+    <div>
+        <p class="eyebrow">Sketch to app</p>
+        <h1>Draw your app idea</h1>
+        <p class="intro">Sketch several screens and connect their flow on one board. Label screens with the pen and add written context below.</p>
+    </div>
+    <button class="build-button" disabled="@(!_ready || _busy || _conflict)" @onclick="BuildAsync">
+        @(_building ? "Building…" : "Build / update")
+    </button>
+</header>
+
+@if (!_ready)
+{
+    <section class="notice" role="status">
+        @if (_loading)
+        {
+            <p>Loading your saved board…</p>
+        }
+        else
+        {
+            <p>@_error</p>
+            <button @onclick="LoadAsync">Retry loading</button>
+        }
+    </section>
+}
+else
+{
+    <section class="workspace" aria-label="Sketch board">
+        <div class="toolbar" role="toolbar" aria-label="Drawing tools">
+            <button class="@(_tool == "pen" ? "selected" : "")" disabled="@_busy" aria-pressed="@(_tool == "pen")" @onclick="SelectPen">Pen</button>
+            <button class="@(_tool == "eraser" ? "selected" : "")" disabled="@_busy" aria-pressed="@(_tool == "eraser")" @onclick="SelectEraser">Eraser</button>
+            <label>Color <input type="color" value="@_color" disabled="@(_busy || _tool == "eraser")" @onchange="e => _color = e.Value?.ToString() ?? _color" /></label>
+            <label>Size <input type="range" min="2" max="28" value="@_size" disabled="@_busy" @oninput="e => _size = int.TryParse(e.Value?.ToString(), out var size) ? size : _size" /></label>
+            <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="Undo">Undo</button>
+            <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="Clear">Clear board</button>
+            <button disabled="@_busy" @onclick="ExportAsync">Save sketch</button>
+            <label class="file-button @(_busy || _conflict ? "disabled" : "")">
+                Load sketch
+                <InputFile @key="_fileInputKey" OnChange="ImportAsync" accept=".json,application/json" disabled="@(_busy || _conflict)" />
+            </label>
+            <span class="spacer"></span>
+            <span class="status" role="status">@(_importing ? "Importing…" : _saving ? "Auto-saving…" : _revision == _savedRevision ? $"Auto-saved · version {_version}" : "Auto-save pending")</span>
+        </div>
+
+        <div class="board-frame">
+            <div class="board" @ref="_board">
+                <SKCanvasView @ref="_canvas" class="sketch-canvas" IgnorePixelScaling="true" OnPaintSurface="Paint" />
+                <div class="pointer-layer" style="pointer-events:@(_busy ? "none" : "auto")"
+                     @onpointerdown="PointerDown" @onpointermove="PointerMove"
+                     @onpointerup="PointerUp" @onpointercancel="PointerCancel"
+                     aria-label="Freeform drawing surface"></div>
+            </div>
+        </div>
+
+        <label class="notes-label" for="board-notes">Notes for the generated app</label>
+        <textarea id="board-notes" maxlength="10000" rows="4" disabled="@_busy"
+                  placeholder="Describe navigation, interactions, data, and anything the drawing cannot convey."
+                  value="@_document.Notes" @oninput="NotesChanged"></textarea>
+        <p class="hint">Your board still auto-saves to this session. Save sketch downloads a portable board JSON document (width, height, strokes, notes); Load sketch replaces the board and saves it to this session after confirming. Build / update sends the complete image and notes.</p>
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(_error) && _ready)
+{
+    <section class="notice error" role="alert">
+        <p>@_error</p>
+        @if (_conflict)
+        {
+            <button @onclick="LoadAsync">Discard local changes and reload latest board</button>
+        }
+        else if (!_importError)
+        {
+            <button disabled="@_busy" @onclick="RetrySaveAsync">Retry save</button>
+        }
+    </section>
+}
+@if (!string.IsNullOrWhiteSpace(_result))
+{
+    <section class="notice success" role="status">@_result</section>
+}
+
+@code {
+    private const int MaxStrokes = 800;
+    private const int MaxPoints = 80000;
+    private const int MaxPointsPerStroke = 4000;
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
+    private BoardDocument _document = new();
+    private BoardStroke? _activeStroke;
+    private SKCanvasView? _canvas;
+    private ElementReference _board;
+    private IJSObjectReference? _pointerModule;
+    private CancellationTokenSource? _debounce;
+    private long? _pointerId;
+    private long _revision;
+    private long _savedRevision;
+    private int _version;
+    private int _fileInputKey;
+    private int _size = 4;
+    private string _tool = "pen";
+    private string _color = "#273449";
+    private string? _error;
+    private string? _result;
+    private bool _ready;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _building;
+    private bool _importing;
+    private bool _importError;
+    private bool _conflict;
+    private bool _disposed;
+    private bool _busy => _building || _importing;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _pointerModule = await JS.InvokeAsync<IJSObjectReference>("import", "./board.js");
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _debounce?.Cancel();
+        try
+        {
+            var state = await Api.LoadAsync();
+            Validate(state.Document);
+            _document = state.Document;
+            _version = state.Version;
+            _revision = _savedRevision = 0;
+            _activeStroke = null;
+            _pointerId = null;
+            _conflict = false;
+            _importError = false;
+            _error = null;
+            _result = null;
+            _ready = true;
+            _canvas?.Invalidate();
+        }
+        catch (Exception ex)
+        {
+            if (!_ready)
+                _error = $"Could not load your board: {ex.Message} Check the server and retry.";
+            else
+                _error = $"Could not reload the board: {ex.Message} Your local changes are still here.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static void Validate(BoardDocument document)
+    {
+        if (document.Width != 1200 || document.Height != 800 ||
+            document.Strokes is null || document.Notes is null ||
+            document.Strokes.Count > MaxStrokes || document.Notes.Length > 10000 ||
+            document.Strokes.Any(s => s.Points is null || s.Points.Count > MaxPointsPerStroke ||
+                s.Size is < 1 or > 100 || s.Tool is not ("pen" or "eraser")) ||
+            document.Strokes.Sum(s => s.Points.Count) > MaxPoints)
+            throw new InvalidOperationException("The saved board exceeds supported dimensions or limits.");
+    }
+
+    private void Paint(SKPaintSurfaceEventArgs e)
+    {
+        var canvas = e.Surface.Canvas;
+        canvas.Save();
+        canvas.Scale(e.Info.Width / (float)_document.Width, e.Info.Height / (float)_document.Height);
+        BoardRenderer.Draw(canvas, _document, _activeStroke);
+        canvas.Restore();
+    }
+
+    private async Task PointerDown(PointerEventArgs e)
+    {
+        if (!_ready || _busy || _pointerId is not null || _pointerModule is null)
+            return;
+        if (e.PointerType == "mouse" && e.Button != 0)
+            return;
+        if (_document.Strokes.Count >= MaxStrokes ||
+            _document.Strokes.Sum(s => s.Points.Count) >= MaxPoints)
+        {
+            _error = "Board limit reached. Undo or clear strokes to continue.";
+            return;
+        }
+        _pointerId = e.PointerId;
+        _activeStroke = new BoardStroke { Tool = _tool, Color = _color, Size = _tool == "eraser" ? _size * 3 : _size };
+        try
+        {
+            var point = await _pointerModule.InvokeAsync<BoardPoint>("start", _board, e.PointerId, e.ClientX, e.ClientY);
+            if (_pointerId == e.PointerId)
+                AddPoint(point);
+        }
+        catch (JSException ex)
+        {
+            _pointerId = null;
+            _activeStroke = null;
+            _error = $"Drawing could not start: {ex.Message}";
+        }
+    }
+
+    private async Task PointerMove(PointerEventArgs e)
+    {
+        if (_pointerId != e.PointerId || _activeStroke is null || _pointerModule is null)
+            return;
+        try
+        {
+            var point = await _pointerModule.InvokeAsync<BoardPoint>("point", _board, e.ClientX, e.ClientY);
+            if (_pointerId == e.PointerId)
+                AddPoint(point);
+        }
+        catch (JSException ex)
+        {
+            _error = $"Drawing interrupted: {ex.Message} Lift the pointer and retry.";
+            FinishStroke();
+        }
+    }
+
+    private void AddPoint(BoardPoint point)
+    {
+        if (_activeStroke is null || _activeStroke.Points.Count >= MaxPointsPerStroke ||
+            _document.Strokes.Sum(s => s.Points.Count) + _activeStroke.Points.Count >= MaxPoints)
+            return;
+        var previous = _activeStroke.Points.LastOrDefault();
+        if (previous is not null && Math.Abs(previous.X - point.X) + Math.Abs(previous.Y - point.Y) < 0.7)
+            return;
+        _activeStroke.Points.Add(point);
+        _canvas?.Invalidate();
+    }
+
+    private async Task PointerUp(PointerEventArgs e)
+    {
+        if (_pointerId != e.PointerId)
+            return;
+        if (_pointerModule is not null)
+        {
+            try
+            {
+                AddPoint(await _pointerModule.InvokeAsync<BoardPoint>("point", _board, e.ClientX, e.ClientY));
+                await _pointerModule.InvokeVoidAsync("end", _board, e.PointerId);
+            }
+            catch (JSException)
+            {
+                // A lost capture still commits the points already drawn.
+            }
+        }
+        FinishStroke();
+    }
+
+    private void PointerCancel(PointerEventArgs e)
+    {
+        if (_pointerId == e.PointerId)
+            FinishStroke();
+    }
+
+    private void FinishStroke()
+    {
+        _pointerId = null;
+        if (_activeStroke is { Points.Count: > 0 } stroke)
+        {
+            _document.Strokes.Add(stroke);
+            Changed();
+        }
+        _activeStroke = null;
+        _canvas?.Invalidate();
+    }
+
+    private void Undo()
+    {
+        if (_activeStroke is not null)
+            FinishStroke();
+        if (_document.Strokes.Count == 0)
+            return;
+        _document.Strokes.RemoveAt(_document.Strokes.Count - 1);
+        Changed();
+        _canvas?.Invalidate();
+    }
+
+    private void SelectPen() => _tool = "pen";
+    private void SelectEraser() => _tool = "eraser";
+
+    private void Clear()
+    {
+        _activeStroke = null;
+        _pointerId = null;
+        _document.Strokes.Clear();
+        Changed();
+        _canvas?.Invalidate();
+    }
+
+    private void NotesChanged(ChangeEventArgs e)
+    {
+        var notes = e.Value?.ToString() ?? "";
+        if (notes == _document.Notes)
+            return;
+        _document.Notes = notes[..Math.Min(notes.Length, 10000)];
+        Changed();
+    }
+
+    private void Changed()
+    {
+        _revision++;
+        _result = null;
+        if (!_conflict)
+            ScheduleSave();
+    }
+
+    private void ScheduleSave()
+    {
+        _debounce?.Cancel();
+        _debounce?.Dispose();
+        _debounce = new CancellationTokenSource();
+        _ = DebouncedSaveAsync(_debounce.Token);
+    }
+
+    private async Task DebouncedSaveAsync(CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(450, cancellation);
+            if (!_disposed)
+                await InvokeAsync(SaveAsync);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_conflict || !_ready)
+            return;
+        await _saveGate.WaitAsync();
+        try
+        {
+            _saving = true;
+            while (_savedRevision != _revision && !_conflict)
+            {
+                var revision = _revision;
+                var state = new BoardState { Version = _version, Document = _document.Copy() };
+                try
+                {
+                    var saved = await Api.SaveAsync(state);
+                    Validate(saved.Document);
+                    _version = saved.Version;
+                    _savedRevision = revision;
+                    if (_revision == revision && _activeStroke is null)
+                    {
+                        _document = saved.Document;
+                        _canvas?.Invalidate();
+                    }
+                    _error = null;
+                }
+                catch (BoardConflictException)
+                {
+                    _importError = false;
+                    _conflict = true;
+                    _error = "This board changed in another window. Copy any unsaved notes before reloading; reload the latest board to resolve the conflict.";
+                }
+                catch (Exception ex)
+                {
+                    _importError = false;
+                    _error = $"Save failed: {ex.Message} Your edits remain on this page; retry before reloading or building.";
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            _saving = false;
+            _saveGate.Release();
+            StateHasChanged();
+        }
+    }
+
+    private Task RetrySaveAsync() => SaveAsync();
+
+    private async Task ExportAsync()
+    {
+        if (_busy || !_ready)
+            return;
+        FinishStroke();
+        try
+        {
+            if (_pointerModule is null)
+                throw new InvalidOperationException("The download service is not ready. Retry in a moment.");
+            var json = SketchFile.Export(_document);
+            await _pointerModule.InvokeVoidAsync("downloadJson", "sketch-to-app.json", json);
+            _result = "Sketch JSON downloaded. Automatic session saving remains on.";
+        }
+        catch (Exception ex)
+        {
+            _importError = false;
+            _error = $"Could not download the sketch: {ex.Message} Try Save sketch again.";
+        }
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs e)
+    {
+        if (_busy || _conflict || !_ready)
+            return;
+        _importing = true;
+        _importError = false;
+        _result = null;
+        try
+        {
+            var file = e.File;
+            if (file.Size > SketchFile.MaxFileBytes)
+                throw new InvalidDataException("The sketch file is too large (maximum 5 MB).");
+            await using var stream = file.OpenReadStream(SketchFile.MaxFileBytes);
+            using var reader = new StreamReader(stream);
+            var imported = SketchFile.Import(await reader.ReadToEndAsync());
+
+            if (!await JS.InvokeAsync<bool>("confirm",
+                "Load this sketch? It will replace the current board and save the imported document to this session."))
+                return;
+
+            _debounce?.Cancel();
+            _activeStroke = null;
+            _pointerId = null;
+            _document = imported;
+            _revision++;
+            _canvas?.Invalidate();
+            await SaveAsync();
+            if (_savedRevision == _revision && !_conflict)
+                _result = "Sketch loaded and saved to this session. Automatic saving remains on.";
+        }
+        catch (Exception ex)
+        {
+            _importError = true;
+            _error = $"Could not load sketch: {ex.Message} Choose a valid sketch JSON file and try again.";
+        }
+        finally
+        {
+            _importing = false;
+            _fileInputKey++;
+        }
+    }
+
+    private async Task BuildAsync()
+    {
+        if (_busy || !_ready || _conflict)
+            return;
+        FinishStroke();
+        _building = true;
+        _result = null;
+        _debounce?.Cancel();
+        try
+        {
+            await SaveAsync();
+            if (_savedRevision != _revision || _conflict)
+                return;
+
+            await _saveGate.WaitAsync();
+            try
+            {
+                var document = _document.Copy();
+                var png = BoardRenderer.ExportPngBase64(document);
+                var result = await Api.BuildAsync(new BuildRequest
+                {
+                    Version = _version, Document = document, PngBase64 = png
+                });
+                _version = result.Version;
+                _error = null;
+                _result = $"Build requested. Snapshot: {result.SnapshotPath} (message {result.MessageId}).";
+            }
+            finally
+            {
+                _saveGate.Release();
+            }
+        }
+        catch (BoardConflictException)
+        {
+            _conflict = true;
+            _error = "This board changed in another window. Copy any unsaved notes before reloading, then reload the latest board.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Build failed: {ex.Message} Your board is still here; retry Build / update.";
+        }
+        finally
+        {
+            _building = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _debounce?.Cancel();
+        _debounce?.Dispose();
+        if (_pointerModule is not null)
+            await _pointerModule.DisposeAsync();
+        _saveGate.Dispose();
+    }
+}

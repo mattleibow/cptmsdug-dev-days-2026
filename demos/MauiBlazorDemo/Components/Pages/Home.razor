@@ -65,7 +65,7 @@
     </ul>
     @if (!VisibleTasks.Any())
     {
-        <p class="empty-tasks" role="status">No @(currentFilter == TaskFilter.Active ? "active" : "completed") tasks yet.</p>
+        <p class="empty-tasks" role="status">@EmptyMessage</p>
     }
 
     <div class="task-filters" role="group" aria-label="Filter tasks">
@@ -101,6 +101,13 @@
     private IEnumerable<TaskItem> VisibleTasks => tasks.Where(task =>
         currentFilter == TaskFilter.All || task.IsComplete == (currentFilter == TaskFilter.Completed));
 
+    private string EmptyMessage => currentFilter switch
+    {
+        TaskFilter.Active => "No active tasks yet.",
+        TaskFilter.Completed => "No completed tasks yet.",
+        _ => "No tasks yet."
+    };
+
     private string FilterClass(TaskFilter filter) =>
         currentFilter == filter ? "filter-button selected" : "filter-button";
 
@@ -127,6 +134,7 @@
         }
 
         tasks.Add(new TaskItem(title, newDetails.Trim()));
+        currentFilter = TaskFilter.All;
         showAddForm = false;
         newTitle = string.Empty;
         newDetails = string.Empty;

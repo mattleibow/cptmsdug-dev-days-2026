@@ -6,7 +6,7 @@ Draw a rough screen (or a flow of several screens) in a Copilot side canvas, the
 
 - `.github/extensions/sketch-to-app/` is a project-scoped Copilot canvas extension. Its UI is a .NET 10 standalone Blazor WebAssembly app using `SkiaSharp.Views.Blazor`; the extension serves it from loopback and sends snapshots to the session.
 - `demos/MauiXamlDemo/MauiXamlDemo.csproj` is a .NET 10 native MAUI XAML app with a sketch-generated sign-in-to-dashboard flow. Its sign-in is explicitly demo-only, not real authentication.
-- `demos/MauiBlazorDemo/MauiBlazorDemo.csproj` is a separate .NET 10 MAUI Blazor Hybrid app with a sketch-generated task list, add-task form, and completion toggles.
+- `demos/MauiBlazorDemo/MauiBlazorDemo.csproj` is a separate .NET 10 MAUI Blazor Hybrid app with a sketch-generated task list, add-task form, completion toggles, and filters added through a second full-sketch submission.
 
 The sketches, sent PNGs, and published browser assets are saved under this **Copilot session's** `files/sketch-to-app/` artifacts, not in the Git repository. Reopening the canvas in this session restores the board; another session starts with an empty board. Changes Copilot makes to either MAUI app are ordinary repository changes.
 

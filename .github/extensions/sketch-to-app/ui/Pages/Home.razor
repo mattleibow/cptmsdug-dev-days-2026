@@ -12,8 +12,8 @@
 <header class="app-header">
     <div>
         <p class="eyebrow">Sketch to app</p>
-        <h1>Draw your app idea</h1>
-        <p class="intro">Sketch several screens and connect their flow on one board. Label screens with the pen and add written context below.</p>
+        <h1>Sketch an app screen</h1>
+        <p class="intro">Draw a screen or flow, add notes, then send the whole sketch to Copilot.</p>
     </div>
     <button class="build-button" disabled="@(!_ready || _busy || _conflict)" @onclick="BuildAsync">
         @(_building ? "Building…" : "Build / update")
@@ -44,13 +44,13 @@ else
             <label>Size <input type="range" min="2" max="28" value="@_size" disabled="@_busy" @oninput="e => _size = int.TryParse(e.Value?.ToString(), out var size) ? size : _size" /></label>
             <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="Undo">Undo</button>
             <button disabled="@(_busy || (_document.Strokes.Count == 0 && _document.BackgroundPngBase64 is null))" @onclick="Clear">Clear board</button>
-            <button disabled="@_busy" @onclick="ExportAsync">Save sketch</button>
+            <button disabled="@_busy" @onclick="ExportAsync">Save PNG</button>
             <label class="file-button @(_busy || _conflict ? "disabled" : "")">
-                Load sketch
+                Load image
                 <InputFile @key="_fileInputKey" OnChange="ImportAsync" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled="@(_busy || _conflict)" />
             </label>
             <span class="spacer"></span>
-            <span class="status" role="status">@(_importing ? "Importing…" : _saving ? "Auto-saving…" : _revision == _savedRevision ? $"Auto-saved · version {_version}" : "Auto-save pending")</span>
+            <span class="status" role="status">@(_importing ? "Importing…" : _saving ? "Saving…" : _revision == _savedRevision ? "Auto-saved" : "Unsaved changes")</span>
         </div>
 
         <div class="board-frame">
@@ -63,11 +63,11 @@ else
             </div>
         </div>
 
-        <label class="notes-label" for="board-notes">Notes for the generated app</label>
+        <label class="notes-label" for="board-notes">Notes for Copilot</label>
         <textarea id="board-notes" maxlength="10000" rows="4" disabled="@_busy"
-                  placeholder="Describe navigation, interactions, data, and anything the drawing cannot convey."
+                  placeholder="Describe interactions and anything the drawing cannot show."
                   value="@_document.Notes" @oninput="NotesChanged"></textarea>
-        <p class="hint">Your board auto-saves to this session. Save sketch downloads a flattened PNG of the whole board; notes are not embedded in the image. Load sketch accepts PNG or JPEG, fits it on the board without distortion, and resets strokes and notes after confirmation. Build / update sends the complete image and notes.</p>
+        <p class="hint">Auto-saved in this session. Save PNG downloads the whole board (not notes). Load image accepts PNG or JPEG and replaces the board and notes. Build / update sends the image and notes to Copilot.</p>
     </section>
 }
 
@@ -412,12 +412,12 @@ else
             var png = BoardRenderer.ExportPngBase64(_document, _background);
             await _pointerModule.InvokeVoidAsync("downloadPng", "sketch-to-app.png", png);
             _error = null;
-            _result = "Sketch PNG downloaded. Notes are not included in the image; automatic session saving remains on.";
+            _result = "PNG downloaded. Notes stay in this session.";
         }
         catch (Exception ex)
         {
             _importError = false;
-            _error = $"Could not download the sketch: {ex.Message} Try Save sketch again.";
+            _error = $"Could not download the sketch: {ex.Message} Try Save PNG again.";
         }
     }
 
@@ -452,7 +452,7 @@ else
             _canvas?.Invalidate();
             await SaveAsync();
             if (_savedRevision == _revision && !_conflict)
-                _result = "Sketch loaded and saved to this session. Automatic saving remains on.";
+                _result = "Image loaded and saved to this session.";
         }
         catch (Exception ex)
         {
@@ -491,7 +491,7 @@ else
                 });
                 _version = result.Version;
                 _error = null;
-                _result = $"Build requested. Snapshot: {result.SnapshotPath} (message {result.MessageId}).";
+                _result = "Sketch sent to Copilot. Follow the chat to see the app update.";
             }
             finally
             {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,13 +28,12 @@ function chunk(type, data) {
     return Buffer.concat([length, name, data, checksum]);
 }
 
-function png() {
+function png(width = 1200, height = 800, pixels = Buffer.alloc(height * (1 + width * 4))) {
     const ihdr = Buffer.alloc(13);
-    ihdr.writeUInt32BE(1200);
-    ihdr.writeUInt32BE(800, 4);
+    ihdr.writeUInt32BE(width);
+    ihdr.writeUInt32BE(height, 4);
     ihdr[8] = 8;
     ihdr[9] = 6;
-    const pixels = Buffer.alloc(800 * (1 + 1200 * 4));
     return Buffer.concat([
         Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
         chunk("IHDR", ihdr),
@@ -77,16 +76,29 @@ test("concurrent writes are serialized and invalid sketches are rejected", async
     } }), (error) => error.status === 400);
 });
 
-test("both portable example sketches conform to the same saved board format", async (t) => {
+test("portable example files are images, not JSON documents", async () => {
+    const login = await readFile(new URL("../../../../examples/sketches/login-flow.png", import.meta.url));
+    const tasks = await readFile(new URL("../../../../examples/sketches/task-list.jpg", import.meta.url));
+    assert.deepEqual(decodeSnapshot(login.toString("base64")), login);
+    assert.deepEqual(tasks.subarray(0, 3), Buffer.from([0xff, 0xd8, 0xff]));
+    assert.deepEqual(tasks.subarray(-2), Buffer.from([0xff, 0xd9]));
+});
+
+test("old boards and imported raster backgrounds are valid and persisted", async (t) => {
     const store = new SketchStore(await temporary(t), async () => "unused");
-    let version = 0;
-    for (const name of ["login-flow", "task-list"]) {
-        const source = new URL(`../../../../examples/sketches/${name}.json`, import.meta.url);
-        const document = validateDocument(JSON.parse(await readFile(source, "utf8")));
-        const saved = await store.save({ version, document });
-        version = saved.version;
-        assert.deepEqual((await store.state()).document, document);
-    }
+    const oldDocument = { width: 1200, height: 800, strokes: [], notes: "" };
+    assert.deepEqual(validateDocument(oldDocument), oldDocument);
+    const raster = png().toString("base64");
+    const document = { ...oldDocument, backgroundPngBase64: raster };
+    const saved = await store.save({ version: 0, document });
+    assert.equal(saved.version, 1);
+    assert.equal((await store.state()).document.backgroundPngBase64, raster);
+    await assert.rejects(store.save({
+        version: 1, document: { ...document, backgroundPngBase64: "not an image" },
+    }), (error) => error.status === 400);
+    await assert.rejects(store.save({
+        version: 1, document: { ...document, backgroundPngBase64: png(240, 160).toString("base64") },
+    }), (error) => error.status === 400);
 });
 
 test("server limits match the UI's documented board limits", () => {
@@ -148,6 +160,9 @@ test("invalid PNGs and failed sends are surfaced, not reported as success", asyn
     invalid[30] ^= 1;
     assert.throws(() => decodeSnapshot(invalid.toString("base64")),
         (error) => error.status === 400);
+    const malformedBase64 = png().toString("base64").replace(/^./, "_");
+    assert.throws(() => decodeSnapshot(malformedBase64),
+        (error) => error.status === 400);
     const store = new SketchStore(await temporary(t), async () => {
         throw new Error("Session is disconnected");
     });
@@ -196,6 +211,30 @@ test("loopback server serves assets and validates API writes", async (t) => {
     });
     assert.equal(built.status, 200);
     assert.equal((await built.json()).messageId, "message-id");
+
+    const pixels = randomBytes(800 * (1 + 1200 * 4));
+    for (let row = 0; row < 800; row++) pixels[row * (1 + 1200 * 4)] = 0;
+    const largePng = png(1200, 800, pixels).toString("base64");
+    const raster = { ...emptyDocument(), backgroundPngBase64: largePng };
+    const saveBody = JSON.stringify({ version: 1, document: raster });
+    assert.ok(Buffer.byteLength(saveBody) > 4 * 1024 * 1024);
+    const savedRaster = await fetch(`${origin}/api/state`, {
+        method: "PUT", headers: { "Content-Type": "application/json", Origin: origin },
+        body: saveBody,
+    });
+    const savedRasterResult = await savedRaster.json();
+    assert.equal(savedRaster.status, 200, JSON.stringify(savedRasterResult));
+    assert.equal(savedRasterResult.version, 2);
+
+    const buildBody = JSON.stringify({ version: 2, document: raster, pngBase64: largePng });
+    assert.ok(Buffer.byteLength(buildBody) > 8 * 1024 * 1024);
+    const builtRaster = await fetch(`${origin}/api/build`, {
+        method: "POST", headers: { "Content-Type": "application/json", Origin: origin },
+        body: buildBody,
+    });
+    const builtRasterResult = await builtRaster.json();
+    assert.equal(builtRaster.status, 200, JSON.stringify(builtRasterResult));
+    assert.equal(builtRasterResult.messageId, "message-id");
 });
 
 test("the loading page reports publish errors and supports retry", async (t) => {

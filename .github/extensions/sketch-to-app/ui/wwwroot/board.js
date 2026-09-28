@@ -19,8 +19,12 @@ export function end(board, pointerId) {
         layer.releasePointerCapture(pointerId);
 }
 
-export function downloadJson(filename, json) {
-    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+export function downloadPng(filename, base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++)
+        bytes[i] = binary.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;

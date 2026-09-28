@@ -43,11 +43,11 @@ else
             <label>Color <input type="color" value="@_color" disabled="@(_busy || _tool == "eraser")" @onchange="e => _color = e.Value?.ToString() ?? _color" /></label>
             <label>Size <input type="range" min="2" max="28" value="@_size" disabled="@_busy" @oninput="e => _size = int.TryParse(e.Value?.ToString(), out var size) ? size : _size" /></label>
             <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="Undo">Undo</button>
-            <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="Clear">Clear board</button>
+            <button disabled="@(_busy || (_document.Strokes.Count == 0 && _document.BackgroundPngBase64 is null))" @onclick="Clear">Clear board</button>
             <button disabled="@_busy" @onclick="ExportAsync">Save sketch</button>
             <label class="file-button @(_busy || _conflict ? "disabled" : "")">
                 Load sketch
-                <InputFile @key="_fileInputKey" OnChange="ImportAsync" accept=".json,application/json" disabled="@(_busy || _conflict)" />
+                <InputFile @key="_fileInputKey" OnChange="ImportAsync" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled="@(_busy || _conflict)" />
             </label>
             <span class="spacer"></span>
             <span class="status" role="status">@(_importing ? "Importing…" : _saving ? "Auto-saving…" : _revision == _savedRevision ? $"Auto-saved · version {_version}" : "Auto-save pending")</span>
@@ -67,7 +67,7 @@ else
         <textarea id="board-notes" maxlength="10000" rows="4" disabled="@_busy"
                   placeholder="Describe navigation, interactions, data, and anything the drawing cannot convey."
                   value="@_document.Notes" @oninput="NotesChanged"></textarea>
-        <p class="hint">Your board still auto-saves to this session. Save sketch downloads a portable board JSON document (width, height, strokes, notes); Load sketch replaces the board and saves it to this session after confirming. Build / update sends the complete image and notes.</p>
+        <p class="hint">Your board auto-saves to this session. Save sketch downloads a flattened PNG of the whole board; notes are not embedded in the image. Load sketch accepts PNG or JPEG, fits it on the board without distortion, and resets strokes and notes after confirmation. Build / update sends the complete image and notes.</p>
     </section>
 }
 
@@ -96,6 +96,7 @@ else
     private const int MaxPointsPerStroke = 4000;
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private BoardDocument _document = new();
+    private SKImage? _background;
     private BoardStroke? _activeStroke;
     private SKCanvasView? _canvas;
     private ElementReference _board;
@@ -137,6 +138,9 @@ else
         {
             var state = await Api.LoadAsync();
             Validate(state.Document);
+            var background = state.Document.BackgroundPngBase64 is { } png
+                ? SketchFile.DecodeBackground(png) : null;
+            ReplaceBackground(background);
             _document = state.Document;
             _version = state.Version;
             _revision = _savedRevision = 0;
@@ -173,12 +177,19 @@ else
             throw new InvalidOperationException("The saved board exceeds supported dimensions or limits.");
     }
 
+    private void ReplaceBackground(SKImage? background)
+    {
+        var previous = _background;
+        _background = background;
+        previous?.Dispose();
+    }
+
     private void Paint(SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
         canvas.Save();
         canvas.Scale(e.Info.Width / (float)_document.Width, e.Info.Height / (float)_document.Height);
-        BoardRenderer.Draw(canvas, _document, _activeStroke);
+        BoardRenderer.Draw(canvas, _document, _activeStroke, _background);
         canvas.Restore();
     }
 
@@ -295,6 +306,8 @@ else
         _activeStroke = null;
         _pointerId = null;
         _document.Strokes.Clear();
+        _document.BackgroundPngBase64 = null;
+        ReplaceBackground(null);
         Changed();
         _canvas?.Invalidate();
     }
@@ -355,6 +368,9 @@ else
                     _savedRevision = revision;
                     if (_revision == revision && _activeStroke is null)
                     {
+                        if (saved.Document.BackgroundPngBase64 != _document.BackgroundPngBase64)
+                            ReplaceBackground(saved.Document.BackgroundPngBase64 is { } png
+                                ? SketchFile.DecodeBackground(png) : null);
                         _document = saved.Document;
                         _canvas?.Invalidate();
                     }
@@ -393,9 +409,10 @@ else
         {
             if (_pointerModule is null)
                 throw new InvalidOperationException("The download service is not ready. Retry in a moment.");
-            var json = SketchFile.Export(_document);
-            await _pointerModule.InvokeVoidAsync("downloadJson", "sketch-to-app.json", json);
-            _result = "Sketch JSON downloaded. Automatic session saving remains on.";
+            var png = BoardRenderer.ExportPngBase64(_document, _background);
+            await _pointerModule.InvokeVoidAsync("downloadPng", "sketch-to-app.png", png);
+            _error = null;
+            _result = "Sketch PNG downloaded. Notes are not included in the image; automatic session saving remains on.";
         }
         catch (Exception ex)
         {
@@ -415,19 +432,22 @@ else
         {
             var file = e.File;
             if (file.Size > SketchFile.MaxFileBytes)
-                throw new InvalidDataException("The sketch file is too large (maximum 5 MB).");
+                throw new InvalidDataException("The image is too large (maximum 8 MiB).");
             await using var stream = file.OpenReadStream(SketchFile.MaxFileBytes);
-            using var reader = new StreamReader(stream);
-            var imported = SketchFile.Import(await reader.ReadToEndAsync());
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            var png = SketchFile.ImportImage(buffer.ToArray());
 
             if (!await JS.InvokeAsync<bool>("confirm",
-                "Load this sketch? It will replace the current board and save the imported document to this session."))
+                "Load this image? It will replace the current board, clear existing strokes and notes, and save the new background to this session."))
                 return;
 
+            var background = SketchFile.DecodeBackground(png);
             _debounce?.Cancel();
             _activeStroke = null;
             _pointerId = null;
-            _document = imported;
+            _document = new BoardDocument { BackgroundPngBase64 = png };
+            ReplaceBackground(background);
             _revision++;
             _canvas?.Invalidate();
             await SaveAsync();
@@ -437,7 +457,7 @@ else
         catch (Exception ex)
         {
             _importError = true;
-            _error = $"Could not load sketch: {ex.Message} Choose a valid sketch JSON file and try again.";
+            _error = $"Could not load sketch: {ex.Message} Choose a valid PNG or JPEG image and try again.";
         }
         finally
         {
@@ -464,7 +484,7 @@ else
             try
             {
                 var document = _document.Copy();
-                var png = BoardRenderer.ExportPngBase64(document);
+                var png = BoardRenderer.ExportPngBase64(document, _background);
                 var result = await Api.BuildAsync(new BuildRequest
                 {
                     Version = _version, Document = document, PngBase64 = png
@@ -500,6 +520,7 @@ else
         _debounce?.Dispose();
         if (_pointerModule is not null)
             await _pointerModule.DisposeAsync();
+        _background?.Dispose();
         _saveGate.Dispose();
     }
 }

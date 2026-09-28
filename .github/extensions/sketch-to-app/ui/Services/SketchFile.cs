@@ -1,71 +1,135 @@
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using SketchToApp.Web.Models;
+using SkiaSharp;
 
 namespace SketchToApp.Web.Services;
 
-public static partial class SketchFile
+public static class SketchFile
 {
-    public const long MaxFileBytes = 5_000_000;
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    public const long MaxFileBytes = 8 * 1024 * 1024;
+    private const long MaxPixels = 16_000_000;
+    private const int BoardWidth = 1200;
+    private const int BoardHeight = 800;
 
-    public static string Export(BoardDocument document) =>
-        JsonSerializer.Serialize(document.Copy(), JsonOptions);
-
-    public static BoardDocument Import(string json)
+    public static string ImportImage(byte[] bytes)
     {
-        using var data = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 32 });
-        var document = data.RootElement;
-        var width = Property(document, "width", JsonValueKind.Number);
-        var height = Property(document, "height", JsonValueKind.Number);
-        if (!width.TryGetInt32(out var w) || w != 1200 ||
-            !height.TryGetInt32(out var h) || h != 800)
-            throw new InvalidDataException("The board must be 1200 × 800 logical pixels.");
+        using var data = OpenData(bytes);
+        using var codec = OpenCodec(data);
+        if (codec.EncodedFormat is not (SKEncodedImageFormat.Png or SKEncodedImageFormat.Jpeg))
+            throw new InvalidDataException("Choose a PNG or JPEG image.");
+        ValidateDimensions(codec.Info, false);
 
-        var notes = Property(document, "notes", JsonValueKind.String).GetString()!;
-        if (notes.Length > 10000)
-            throw new InvalidDataException("Notes cannot exceed 10,000 characters.");
+        using var bitmap = SKBitmap.Decode(data)
+            ?? throw new InvalidDataException("The image is corrupt or could not be decoded.");
+        using var surface = CreateBoardSurface();
+        surface.Canvas.Clear(SKColors.White);
+        var rotated = codec.EncodedOrigin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
+            or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+        var width = rotated ? bitmap.Height : bitmap.Width;
+        var height = rotated ? bitmap.Width : bitmap.Height;
+        var scale = Math.Min(BoardWidth / (float)width, BoardHeight / (float)height);
+        var destination = new SKRect(
+            (BoardWidth - width * scale) / 2, (BoardHeight - height * scale) / 2,
+            (BoardWidth + width * scale) / 2, (BoardHeight + height * scale) / 2);
+        DrawOrientedBitmap(surface.Canvas, bitmap, codec.EncodedOrigin, destination, scale);
+        using var image = surface.Snapshot();
+        using var encoded = image.Encode(SKEncodedImageFormat.Png, 100)
+            ?? throw new InvalidDataException("Could not encode the imported image.");
+        if (encoded.Size > MaxFileBytes)
+            throw new InvalidDataException("The normalized PNG exceeds 8 MiB.");
+        return Convert.ToBase64String(encoded.ToArray());
+    }
 
-        var strokes = Property(document, "strokes", JsonValueKind.Array);
-        if (strokes.GetArrayLength() > 800)
-            throw new InvalidDataException("A sketch cannot contain more than 800 strokes.");
-        var pointCount = 0;
-        foreach (var stroke in strokes.EnumerateArray())
+    private static void DrawOrientedBitmap(SKCanvas canvas, SKBitmap bitmap, SKEncodedOrigin origin, SKRect destination, float scale)
+    {
+        canvas.Save();
+        canvas.Translate(destination.Left, destination.Top);
+        canvas.Scale(scale);
+        // Decoding preserves the stored pixels; apply the image's EXIF orientation before fitting it.
+        switch (origin)
         {
-            var tool = Property(stroke, "tool", JsonValueKind.String).GetString();
-            var color = Property(stroke, "color", JsonValueKind.String).GetString();
-            var size = Property(stroke, "size", JsonValueKind.Number);
-            if (tool is not ("pen" or "eraser") || color is null || !HexColor().IsMatch(color) ||
-                !size.TryGetSingle(out var strokeSize) || !float.IsFinite(strokeSize) ||
-                strokeSize is < 1 or > 100)
-                throw new InvalidDataException("Each stroke requires a pen or eraser tool, #RRGGBB color, and size from 1 to 100.");
-
-            var points = Property(stroke, "points", JsonValueKind.Array);
-            pointCount += points.GetArrayLength();
-            if (points.GetArrayLength() is < 1 or > 4000 || pointCount > 80000)
-                throw new InvalidDataException("A sketch is limited to 4,000 points per stroke and 80,000 points overall.");
-            foreach (var point in points.EnumerateArray())
-            {
-                var x = Property(point, "x", JsonValueKind.Number);
-                var y = Property(point, "y", JsonValueKind.Number);
-                if (!x.TryGetSingle(out var px) || !y.TryGetSingle(out var py) ||
-                    !float.IsFinite(px) || !float.IsFinite(py) ||
-                    px is < 0 or > 1200 || py is < 0 or > 800)
-                    throw new InvalidDataException("Stroke points must be inside the 1200 × 800 board.");
-            }
+            case SKEncodedOrigin.TopLeft:
+                break;
+            case SKEncodedOrigin.TopRight:
+                canvas.Translate(bitmap.Width, 0);
+                canvas.Scale(-1, 1);
+                break;
+            case SKEncodedOrigin.BottomRight:
+                canvas.Translate(bitmap.Width, bitmap.Height);
+                canvas.Scale(-1, -1);
+                break;
+            case SKEncodedOrigin.BottomLeft:
+                canvas.Translate(0, bitmap.Height);
+                canvas.Scale(1, -1);
+                break;
+            case SKEncodedOrigin.LeftTop:
+                canvas.RotateDegrees(90);
+                canvas.Scale(1, -1);
+                break;
+            case SKEncodedOrigin.RightTop:
+                canvas.Translate(bitmap.Height, 0);
+                canvas.RotateDegrees(90);
+                break;
+            case SKEncodedOrigin.RightBottom:
+                canvas.Translate(bitmap.Height, bitmap.Width);
+                canvas.RotateDegrees(90);
+                canvas.Scale(-1, 1);
+                break;
+            case SKEncodedOrigin.LeftBottom:
+                canvas.Translate(0, bitmap.Width);
+                canvas.RotateDegrees(-90);
+                break;
+            default:
+                throw new InvalidDataException("The image orientation is unsupported.");
         }
-        return JsonSerializer.Deserialize<BoardDocument>(json, JsonOptions)
-            ?? throw new InvalidDataException("The sketch JSON must contain a board document.");
+        canvas.DrawBitmap(bitmap, new SKRect(0, 0, bitmap.Width, bitmap.Height),
+            new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+        canvas.Restore();
     }
 
-    private static JsonElement Property(JsonElement parent, string name, JsonValueKind kind)
+    public static SKImage DecodeBackground(string base64)
     {
-        if (parent.ValueKind != JsonValueKind.Object ||
-            !parent.TryGetProperty(name, out var value) || value.ValueKind != kind)
-            throw new InvalidDataException($"The sketch JSON requires a {kind.ToString().ToLowerInvariant()} '{name}' field.");
-        return value;
+        byte[] bytes;
+        try
+        {
+            if (base64.Length > ((MaxFileBytes + 2) / 3) * 4)
+                throw new InvalidDataException("The saved background exceeds 8 MiB.");
+            bytes = Convert.FromBase64String(base64);
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidDataException("The saved background is not valid base64.", ex);
+        }
+
+        using var data = OpenData(bytes);
+        using var codec = OpenCodec(data);
+        if (codec.EncodedFormat != SKEncodedImageFormat.Png)
+            throw new InvalidDataException("The saved background must be a PNG.");
+        ValidateDimensions(codec.Info, true);
+        using var bitmap = SKBitmap.Decode(data)
+            ?? throw new InvalidDataException("The saved background PNG is corrupt.");
+        return SKImage.FromBitmap(bitmap)
+            ?? throw new InvalidDataException("Could not load the saved background.");
     }
 
-    [GeneratedRegex("^#[0-9a-fA-F]{6}$", RegexOptions.CultureInvariant)]
-    private static partial Regex HexColor();
+    private static SKData OpenData(byte[] bytes)
+    {
+        if (bytes.Length == 0 || bytes.LongLength > MaxFileBytes)
+            throw new InvalidDataException("The image must be nonempty and no larger than 8 MiB.");
+        return SKData.CreateCopy(bytes);
+    }
+
+    private static SKCodec OpenCodec(SKData data) =>
+        SKCodec.Create(data) ?? throw new InvalidDataException("The image is unsupported or corrupt.");
+
+    private static void ValidateDimensions(SKImageInfo info, bool boardOnly)
+    {
+        if (info.Width <= 0 || info.Height <= 0 || (long)info.Width * info.Height > MaxPixels ||
+            (boardOnly && (info.Width != BoardWidth || info.Height != BoardHeight)))
+            throw new InvalidDataException(boardOnly
+                ? "The saved background must be a 1200 × 800 PNG."
+                : "The image dimensions are invalid or exceed 16 million pixels.");
+    }
+
+    private static SKSurface CreateBoardSurface() =>
+        SKSurface.Create(new SKImageInfo(BoardWidth, BoardHeight, SKColorType.Rgba8888, SKAlphaType.Opaque))
+        ?? throw new InvalidOperationException("Could not create the board image.");
 }

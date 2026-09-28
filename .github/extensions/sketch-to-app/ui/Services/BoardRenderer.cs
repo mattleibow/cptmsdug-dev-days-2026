@@ -5,9 +5,12 @@ namespace SketchToApp.Web.Services;
 
 public static class BoardRenderer
 {
-    public static void Draw(SKCanvas canvas, BoardDocument document, BoardStroke? preview = null)
+    public static void Draw(SKCanvas canvas, BoardDocument document, BoardStroke? preview = null, SKImage? background = null)
     {
         canvas.Clear(SKColors.White);
+        if (background is not null)
+            canvas.DrawImage(background, new SKRect(0, 0, document.Width, document.Height),
+                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
         foreach (var stroke in document.Strokes)
             DrawStroke(canvas, stroke);
         if (preview is not null)
@@ -46,12 +49,14 @@ public static class BoardRenderer
         }
     }
 
-    public static string ExportPngBase64(BoardDocument document)
+    public static string ExportPngBase64(BoardDocument document, SKImage? background = null)
     {
+        using var decodedBackground = background is null && document.BackgroundPngBase64 is not null
+            ? SketchFile.DecodeBackground(document.BackgroundPngBase64) : null;
         using var surface = SKSurface.Create(new SKImageInfo(
             document.Width, document.Height, SKColorType.Rgba8888, SKAlphaType.Opaque))
             ?? throw new InvalidOperationException("Could not create the board image.");
-        Draw(surface.Canvas, document);
+        Draw(surface.Canvas, document, background: background ?? decodedBackground);
         using var image = surface.Snapshot();
         using var encoded = image.Encode(SKEncodedImageFormat.Png, 100)
             ?? throw new InvalidOperationException("Could not encode the board image.");

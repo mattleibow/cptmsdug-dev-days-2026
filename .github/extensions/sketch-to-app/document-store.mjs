@@ -19,7 +19,7 @@ export class HttpError extends Error {
 }
 
 export function emptyDocument() {
-    return { width: WIDTH, height: HEIGHT, strokes: [], notes: "" };
+    return { width: WIDTH, height: HEIGHT, strokes: [], notes: "", backgroundPngBase64: null };
 }
 
 function exactKeys(value, keys, name) {
@@ -31,11 +31,19 @@ function exactKeys(value, keys, name) {
 }
 
 export function validateDocument(document) {
-    exactKeys(document, ["width", "height", "strokes", "notes"], "document");
+    if (!document || typeof document !== "object" || Array.isArray(document) ||
+        Object.keys(document).some((key) =>
+            !["width", "height", "strokes", "notes", "backgroundPngBase64"].includes(key)) ||
+        ["width", "height", "strokes", "notes"].some((key) => !Object.hasOwn(document, key))) {
+        throw new HttpError(400, "Invalid document.");
+    }
     if (document.width !== WIDTH || document.height !== HEIGHT ||
         typeof document.notes !== "string" || document.notes.length > 10000 ||
         !Array.isArray(document.strokes) || document.strokes.length > MAX_STROKES) {
         throw new HttpError(400, "Invalid board dimensions, notes, or stroke count.");
+    }
+    if (document.backgroundPngBase64 != null) {
+        decodeSnapshot(document.backgroundPngBase64);
     }
 
     let totalPoints = 0;
@@ -77,11 +85,12 @@ function crc32(bytes) {
 export function decodeSnapshot(base64) {
     if (typeof base64 !== "string" || base64.length === 0 ||
         base64.length > Math.ceil(MAX_PNG_BYTES / 3) * 4 ||
-        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) {
+        base64.length % 4 !== 0) {
         throw new HttpError(400, "Expected a base64-encoded PNG under 8 MB.");
     }
     const png = Buffer.from(base64, "base64");
-    if (png.length > MAX_PNG_BYTES || png.length < 57 ||
+    if (png.toString("base64") !== base64 ||
+        png.length > MAX_PNG_BYTES || png.length < 57 ||
         !png.subarray(0, 8).equals(PNG_SIGNATURE)) {
         throw new HttpError(400, "Invalid PNG snapshot.");
     }

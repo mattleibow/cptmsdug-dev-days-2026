@@ -7,12 +7,14 @@ public sealed class BoardDocument
     public int Height { get; set; } = 800;
     public List<BoardStroke> Strokes { get; set; } = [];
     public string Notes { get; set; } = "";
+    public string? BackgroundPngBase64 { get; set; }
 
     public BoardDocument Copy() => new()
     {
         Width = Width,
         Height = Height,
         Notes = Notes,
+        BackgroundPngBase64 = BackgroundPngBase64,
         Strokes = Strokes.Select(stroke => new BoardStroke
         {
             Tool = stroke.Tool,

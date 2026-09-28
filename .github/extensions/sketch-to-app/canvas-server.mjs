@@ -235,9 +235,9 @@ export async function startCanvasServer({ store, publisher }) {
                     throw new HttpError(403, "Invalid canvas origin.");
                 }
                 if (pathname === "/api/state" && req.method === "PUT") {
-                    reply(res, 200, await store.save(await requestJson(req, 5 * 1024 * 1024)));
+                    reply(res, 200, await store.save(await requestJson(req, 20 * 1024 * 1024)));
                 } else if (pathname === "/api/build" && req.method === "POST") {
-                    reply(res, 200, await store.build(await requestJson(req, 20 * 1024 * 1024)));
+                    reply(res, 200, await store.build(await requestJson(req, 32 * 1024 * 1024)));
                 } else if (pathname === "/api/retry" && req.method === "POST") {
                     publisher.retry();
                     reply(res, 200, { status: publisher.status });

@@ -12,7 +12,7 @@
     <div>
         <p class="eyebrow">Sketch to app</p>
         <h1>Sketch whiteboard</h1>
-        <p class="intro">Draw freely. Ask Copilot in chat to load an image, read the board, save a PNG, or build from it.</p>
+        <p class="intro">Draw freely. Ask Copilot in chat to load an image, read the board, export the PNG and notes, or build from it.</p>
     </div>
 </header>
 
@@ -54,7 +54,7 @@ else
         <textarea id="board-notes" maxlength="10000" rows="4" disabled="@_busy"
                   placeholder="Describe interactions and anything the drawing cannot show."
                   value="@_document.Notes" @oninput="NotesChanged"></textarea>
-        <p class="hint">The board and notes auto-save in this session. Ask Copilot in chat to view or save the PNG, load a PNG/JPEG, edit notes, or build an app from your sketch.</p>
+        <p class="hint">The board and notes auto-save in this session. Ask Copilot in chat to export a PNG with Markdown notes, load a PNG/JPEG, edit notes, or build an app from your sketch.</p>
     </section>
 }
 

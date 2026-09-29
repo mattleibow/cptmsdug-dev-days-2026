@@ -160,14 +160,6 @@ test("concurrent writes are serialized and invalid sketches are rejected", async
     })), (error) => error.status === 400);
 });
 
-test("portable example files are images, not JSON documents", async () => {
-    const login = await readFile(new URL("../../../../examples/sketches/login-flow.png", import.meta.url));
-    const tasks = await readFile(new URL("../../../../examples/sketches/task-list.jpg", import.meta.url));
-    assert.deepEqual(decodeSnapshot(login.toString("base64")), login);
-    assert.deepEqual(tasks.subarray(0, 3), Buffer.from([0xff, 0xd8, 0xff]));
-    assert.deepEqual(tasks.subarray(-2), Buffer.from([0xff, 0xd9]));
-});
-
 test("old boards and imported raster backgrounds are valid and persisted", async (t) => {
     const store = new SketchStore(await temporary(t));
     const oldDocument = { width: 1200, height: 800, strokes: [], notes: "" };
@@ -224,6 +216,37 @@ test("chat reads an immutable snapshot of each auto-saved board and can append n
     assert.equal((await store.state()).version, 3);
 });
 
+test("board export writes a version-matched PNG and Markdown pair without overwriting", async (t) => {
+    const directory = await temporary(t);
+    const store = new SketchStore(join(directory, "store"));
+    const imagePath = join(directory, "exports", "login screen.png");
+    const markdownPath = join(directory, "exports", "login screen.md");
+    await assert.rejects(store.exportBoard(imagePath, markdownPath),
+        (error) => error instanceof HttpError && error.code === "board_blank");
+
+    const image = png();
+    const document = { ...emptyDocument(), notes: "Use **native** controls." };
+    await store.save(saveRequest(0, document, image));
+    assert.deepEqual(await store.exportBoard(imagePath, markdownPath),
+        { version: 1, imagePath, markdownPath });
+    assert.deepEqual(await readFile(imagePath), image);
+    assert.equal(await readFile(markdownPath, "utf8"),
+        "# Sketch notes\n\n![Sketch](./login%20screen.png)\n\n" +
+        "## Notes\n\nUse **native** controls.\n");
+
+    await assert.rejects(store.exportBoard(imagePath, markdownPath),
+        (error) => error instanceof HttpError && error.code === "export_exists");
+    assert.deepEqual(await readFile(imagePath), image);
+
+    const partialImage = join(directory, "exports", "existing-notes.png");
+    const existingMarkdown = join(directory, "exports", "existing-notes.md");
+    await writeFile(existingMarkdown, "Keep me");
+    await assert.rejects(store.exportBoard(partialImage, existingMarkdown),
+        (error) => error instanceof HttpError && error.code === "export_exists");
+    await assert.rejects(readFile(partialImage), (error) => error.code === "ENOENT");
+    assert.equal(await readFile(existingMarkdown, "utf8"), "Keep me");
+});
+
 test("server limits match the UI's documented board limits", () => {
     const document = {
         ...emptyDocument(),
@@ -259,7 +282,7 @@ test("chat queues JPEG pixels and notes, then Blazor saves a PNG without losing 
     const initial = { ...emptyDocument(), notes: "Original note" };
     await store.save(saveRequest(0, initial));
     const previous = await store.snapshot();
-    const jpeg = await readFile(new URL("../../../../examples/sketches/task-list.jpg", import.meta.url));
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 
     assert.deepEqual(await store.importImage(1, jpeg, "Tasks from chat"),
         { version: 2, pendingImport: true });

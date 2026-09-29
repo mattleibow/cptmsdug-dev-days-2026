@@ -1,8 +1,8 @@
 // Persist each session's board, PNG snapshots, and images imported from chat.
 // The server revalidates browser uploads before saving; UI checks alone are not authoritative.
+import { basename, dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 
 const WIDTH = 1200;
 const HEIGHT = 800;
@@ -15,9 +15,10 @@ const JPEG_SIGNATURE = Buffer.from([255, 216, 255]);
 
 export class HttpError extends Error {
     // Carry an HTTP status for validation and version conflicts.
-    constructor(status, message) {
+    constructor(status, message, code) {
         super(message);
         this.status = status;
+        this.code = code;
     }
 }
 
@@ -270,6 +271,54 @@ export class SketchStore {
             return { version: current.version, snapshotPath, notes: current.document.notes,
                 mimeType: "image/png", pendingImport: false };
         });
+    }
+
+    // Export one immutable board version as a PNG with a Markdown notes sidecar.
+    async exportBoard(imagePath, markdownPath) {
+        if (typeof imagePath !== "string" || !imagePath ||
+            typeof markdownPath !== "string" || !markdownPath) {
+            throw new HttpError(400, "Invalid export paths.", "invalid_export_path");
+        }
+        const snapshot = await this.snapshot();
+        if (!snapshot.snapshotPath) {
+            throw new HttpError(409, "Draw or import an image before exporting the board.", "board_blank");
+        }
+        if (snapshot.mimeType !== "image/png") {
+            throw new HttpError(409,
+                "Open the canvas and wait for the pending image to auto-save as PNG before exporting.",
+                "board_not_ready");
+        }
+
+        const image = await readFile(snapshot.snapshotPath);
+        const markdown = [
+            "# Sketch notes",
+            "",
+            `![Sketch](./${encodeURIComponent(basename(imagePath))})`,
+            "",
+            "## Notes",
+            "",
+            snapshot.notes || "_No notes provided._",
+            "",
+        ].join("\n");
+        await mkdir(dirname(imagePath), { recursive: true });
+        await mkdir(dirname(markdownPath), { recursive: true });
+
+        const created = [];
+        try {
+            await writeFile(imagePath, image, { flag: "wx" });
+            created.push(imagePath);
+            await writeFile(markdownPath, markdown, { flag: "wx" });
+            created.push(markdownPath);
+        } catch (error) {
+            await Promise.allSettled(created.map((path) => rm(path, { force: true })));
+            if (error.code === "EEXIST") {
+                throw new HttpError(409,
+                    "The PNG or Markdown export already exists. Choose a new path.",
+                    "export_exists");
+            }
+            throw error;
+        }
+        return { version: snapshot.version, imagePath, markdownPath };
     }
 
     // Queue an image for Blazor to fit, orient, and replace the board with.

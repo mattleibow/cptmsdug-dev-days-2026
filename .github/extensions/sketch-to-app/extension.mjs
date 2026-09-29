@@ -2,7 +2,7 @@
 // The Node helpers host/persist the board; Blazor handles drawing in the browser.
 import { readFile, realpath, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CanvasError, createCanvas, joinSession } from "@github/copilot-sdk/extension";
 import { startCanvasServer, UiPublisher } from "./canvas-server.mjs";
 import { HttpError, SketchStore } from "./document-store.mjs";
@@ -13,6 +13,11 @@ const servers = new Map();
 let store;
 let publisher;
 
+function isWithin(root, path) {
+    const suffix = relative(root, path);
+    return !isAbsolute(suffix) && suffix !== ".." && !suffix.startsWith(`..${sep}`);
+}
+
 // Allow chat imports from this repository or the session's attachment/artifact area.
 async function imagePath(path) {
     if (typeof path !== "string" || !path.trim())
@@ -20,10 +25,7 @@ async function imagePath(path) {
     const fullPath = await realpath(isAbsolute(path) ? path : resolve(repositoryDirectory, path));
     const roots = await Promise.all([repositoryDirectory, session.workspacePath]
         .filter(Boolean).map((root) => realpath(root)));
-    if (!roots.some((root) => {
-        const suffix = relative(root, fullPath);
-        return !isAbsolute(suffix) && suffix !== ".." && !suffix.startsWith(`..${sep}`);
-    })) {
+    if (!roots.some((root) => isWithin(root, fullPath))) {
         throw new CanvasError("image_path_denied",
             "Images must be in the repository or this session's files. Copy the image there first.");
     }
@@ -33,13 +35,55 @@ async function imagePath(path) {
     return fullPath;
 }
 
+// Resolve a new repository-relative PNG and sibling Markdown path without following symlinks out.
+async function exportPaths(path) {
+    if (typeof path !== "string" || !path.trim() || path.includes("\0") || isAbsolute(path.trim())) {
+        throw new CanvasError("invalid_export_path",
+            "Provide a repository-relative base path or .png path.");
+    }
+    const requested = path.trim();
+    const extension = extname(requested);
+    if (extension && extension.toLowerCase() !== ".png") {
+        throw new CanvasError("invalid_export_path", "The export path must have no extension or end in .png.");
+    }
+    const imagePath = resolve(repositoryDirectory, extension ? requested : `${requested}.png`);
+    if (!isWithin(repositoryDirectory, imagePath) || !basename(imagePath, extname(imagePath))) {
+        throw new CanvasError("export_path_denied", "The export path must stay inside the repository.");
+    }
+
+    let ancestor = dirname(imagePath);
+    while (true) {
+        try {
+            ancestor = await realpath(ancestor);
+            break;
+        } catch (error) {
+            if (error.code !== "ENOENT") {
+                throw new CanvasError("invalid_export_path", "The export directory is not usable.");
+            }
+            const parent = dirname(ancestor);
+            if (parent === ancestor) {
+                throw new CanvasError("invalid_export_path", "The export directory is not usable.");
+            }
+            ancestor = parent;
+        }
+    }
+    const root = await realpath(repositoryDirectory);
+    if (!isWithin(root, ancestor) || !(await stat(ancestor)).isDirectory()) {
+        throw new CanvasError("export_path_denied", "The export path must stay inside the repository.");
+    }
+
+    const markdownPath = imagePath.slice(0, -extname(imagePath).length) + ".md";
+    return { imagePath, markdownPath };
+}
+
 // Turn validated board conflicts and invalid input into named canvas errors.
 async function canvasAction(operation) {
     try {
         return await operation();
     } catch (error) {
         if (error instanceof HttpError)
-            throw new CanvasError(error.status === 409 ? "board_conflict" : "invalid_board", error.message);
+            throw new CanvasError(error.code ??
+                (error.status === 409 ? "board_conflict" : "invalid_board"), error.message);
         throw error;
     }
 }
@@ -49,7 +93,7 @@ const session = await joinSession({
         createCanvas({
             id: "sketch-to-app",
             displayName: "Sketch to app",
-            description: "A shared sketch and notes whiteboard. Chat can view/export its PNG, load an image, and edit notes; drawing auto-saves.",
+            description: "A shared sketch and notes whiteboard. Chat can view or export its PNG and notes, load an image, and edit notes; drawing auto-saves.",
             inputSchema: { type: "object", additionalProperties: false },
             actions: [
                 {
@@ -62,6 +106,29 @@ const session = await joinSession({
                             throw new CanvasError("workspace_unavailable", "A session workspace is required to store sketches.");
                         }
                         return store.snapshot();
+                    },
+                },
+                {
+                    name: "export_board",
+                    description: "Export the current board as a version-matched PNG and Markdown notes sidecar. Path is repository-relative and may be a base path or end in .png. Existing files are never overwritten.",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            path: {
+                                type: "string", minLength: 1, maxLength: 240,
+                                description: "Repository-relative base path or .png path.",
+                            },
+                        },
+                        required: ["path"],
+                        additionalProperties: false,
+                    },
+                    handler: async (ctx) => {
+                        if (!store) {
+                            throw new CanvasError("workspace_unavailable",
+                                "A session workspace is required to store sketches.");
+                        }
+                        const { imagePath, markdownPath } = await exportPaths(ctx.input.path);
+                        return canvasAction(() => store.exportBoard(imagePath, markdownPath));
                     },
                 },
                 {

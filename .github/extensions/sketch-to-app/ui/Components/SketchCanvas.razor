@@ -1,0 +1,141 @@
+@using SkiaSharp
+@using SkiaSharp.Views.Blazor
+@using SketchToApp.Web.Models
+@using SketchToApp.Web.Services
+@implements IDisposable
+
+<TouchCanvas Width="Document.Width" Height="Document.Height" Disabled="Disabled"
+             Label="Freeform drawing surface" OnStart="StartStroke" OnMove="AddPoint"
+             OnEnd="EndStroke" OnCancel="FinishStrokeAsync" OnError="OnError">
+    <SKCanvasView @ref="_canvas" class="sketch-canvas" IgnorePixelScaling="true" OnPaintSurface="Paint" />
+</TouchCanvas>
+
+@code {
+    [Parameter, EditorRequired] public BoardDocument Document { get; set; } = default!;
+    [Parameter] public string Tool { get; set; } = "pen";
+    [Parameter] public string Color { get; set; } = "#273449";
+    [Parameter] public int Size { get; set; } = 4;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private BoardDocument? _displayedDocument;
+    private BoardStroke? _activeStroke;
+    private SKCanvasView? _canvas;
+    private SKImage? _background;
+    private string? _backgroundPng;
+
+    public bool IsDrawing => _activeStroke is not null;
+
+    protected override void OnParametersSet()
+    {
+        ArgumentNullException.ThrowIfNull(Document);
+        var documentChanged = !ReferenceEquals(_displayedDocument, Document);
+        var backgroundChanged = _backgroundPng != Document.BackgroundPngBase64;
+        if (backgroundChanged)
+        {
+            var background = Document.BackgroundPngBase64 is { } png
+                ? SketchFile.DecodeBackground(png) : null;
+            var previous = _background;
+            _background = background;
+            _backgroundPng = Document.BackgroundPngBase64;
+            previous?.Dispose();
+        }
+        if (documentChanged)
+        {
+            _activeStroke = null;
+            _displayedDocument = Document;
+        }
+        if (documentChanged || backgroundChanged)
+            _canvas?.Invalidate();
+    }
+
+    private void Paint(SKPaintSurfaceEventArgs e)
+    {
+        var canvas = e.Surface.Canvas;
+        canvas.Save();
+        canvas.Scale(e.Info.Width / (float)Document.Width, e.Info.Height / (float)Document.Height);
+        BoardRenderer.Draw(canvas, Document, _activeStroke, _background);
+        canvas.Restore();
+    }
+
+    private async Task StartStroke(CanvasPosition point)
+    {
+        if (Disabled || _activeStroke is not null)
+            return;
+        if (Document.Strokes.Count >= BoardDocument.MaxStrokes ||
+            Document.Strokes.Sum(s => s.Points.Count) >= BoardDocument.MaxPoints)
+        {
+            await OnError.InvokeAsync("Board limit reached. Undo or clear strokes to continue.");
+            return;
+        }
+        _activeStroke = new BoardStroke { Tool = Tool, Color = Color, Size = Tool == "eraser" ? Size * 3 : Size };
+        AddPoint(point);
+    }
+
+    private void AddPoint(CanvasPosition point)
+    {
+        if (_activeStroke is null || _activeStroke.Points.Count >= BoardDocument.MaxPointsPerStroke ||
+            Document.Strokes.Sum(s => s.Points.Count) + _activeStroke.Points.Count >= BoardDocument.MaxPoints)
+            return;
+        var previous = _activeStroke.Points.LastOrDefault();
+        if (previous is not null && Math.Abs(previous.X - point.X) + Math.Abs(previous.Y - point.Y) < 0.7)
+            return;
+        _activeStroke.Points.Add(new BoardPoint { X = point.X, Y = point.Y });
+        _canvas?.Invalidate();
+    }
+
+    private Task EndStroke(CanvasPosition point)
+    {
+        AddPoint(point);
+        return FinishStrokeAsync();
+    }
+
+    private async Task FinishStrokeAsync()
+    {
+        var stroke = _activeStroke;
+        _activeStroke = null;
+        if (stroke is { Points.Count: > 0 })
+        {
+            Document.Strokes.Add(stroke);
+            await OnChanged.InvokeAsync();
+        }
+        _canvas?.Invalidate();
+    }
+
+    public void DiscardStroke()
+    {
+        _activeStroke = null;
+        _canvas?.Invalidate();
+    }
+
+    public async Task UndoAsync()
+    {
+        if (_activeStroke is not null)
+        {
+            DiscardStroke();
+            return;
+        }
+        if (Document.Strokes.Count == 0)
+            return;
+        Document.Strokes.RemoveAt(Document.Strokes.Count - 1);
+        await OnChanged.InvokeAsync();
+        _canvas?.Invalidate();
+    }
+
+    public async Task ClearAsync()
+    {
+        DiscardStroke();
+        if (Document.Strokes.Count == 0 && Document.BackgroundPngBase64 is null)
+            return;
+        Document.Strokes.Clear();
+        Document.BackgroundPngBase64 = null;
+        _backgroundPng = null;
+        _background?.Dispose();
+        _background = null;
+        await OnChanged.InvokeAsync();
+        _canvas?.Invalidate();
+    }
+
+    public void Dispose() => _background?.Dispose();
+}

@@ -1,6 +1,4 @@
 @page "/"
-@using SkiaSharp
-@using SkiaSharp.Views.Blazor
 @using SketchToApp.Web.Components
 @using SketchToApp.Web.Models
 @using SketchToApp.Web.Services
@@ -40,19 +38,16 @@ else
             <button class="@(_tool == "eraser" ? "selected" : "")" disabled="@_busy" aria-pressed="@(_tool == "eraser")" @onclick="SelectEraser">Eraser</button>
             <label>Color <input type="color" value="@_color" disabled="@(_busy || _tool == "eraser")" @onchange="e => _color = e.Value?.ToString() ?? _color" /></label>
             <label>Size <input type="range" min="2" max="28" value="@_size" disabled="@_busy" @oninput="e => _size = int.TryParse(e.Value?.ToString(), out var size) ? size : _size" /></label>
-            <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="Undo">Undo</button>
-            <button disabled="@(_busy || (_document.Strokes.Count == 0 && _document.BackgroundPngBase64 is null))" @onclick="Clear">Clear board</button>
+            <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="UndoAsync">Undo</button>
+            <button disabled="@(_busy || (_document.Strokes.Count == 0 && _document.BackgroundPngBase64 is null))" @onclick="ClearAsync">Clear board</button>
             <span class="spacer"></span>
             <span class="status" role="status">@(_importing ? "Importing…" : _saving ? "Saving…" : _revision == _savedRevision ? "Auto-saved" : "Unsaved changes")</span>
         </div>
 
         <div class="board-frame">
-            <TouchCanvas Width="_document.Width" Height="_document.Height"
-                         Disabled="@(_busy || _loading || _conflict)" Label="Freeform drawing surface"
-                         OnStart="StartStroke" OnMove="AddPoint" OnEnd="EndStroke"
-                         OnCancel="CancelStroke" OnError="DrawingError">
-                <SKCanvasView @ref="_canvas" class="sketch-canvas" IgnorePixelScaling="true" OnPaintSurface="Paint" />
-            </TouchCanvas>
+            <SketchCanvas @ref="_sketch" Document="_document" Tool="@_tool" Color="@_color" Size="_size"
+                          Disabled="@(_busy || _loading || _conflict)"
+                          OnChanged="Changed" OnError="DrawingError" />
         </div>
 
         <label class="notes-label" for="board-notes">Notes for Copilot</label>
@@ -95,14 +90,9 @@ else
 }
 
 @code {
-    private const int MaxStrokes = 800;
-    private const int MaxPoints = 80000;
-    private const int MaxPointsPerStroke = 4000;
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private BoardDocument _document = new();
-    private SKImage? _background;
-    private BoardStroke? _activeStroke;
-    private SKCanvasView? _canvas;
+    private SketchCanvas? _sketch;
     private IJSObjectReference? _eventModule;
     private IJSObjectReference? _events;
     private DotNetObjectReference<Home>? _dotNetRef;
@@ -143,6 +133,7 @@ else
     private async Task LoadAsync()
     {
         _loading = true;
+        _sketch?.DiscardStroke();
         _debounce?.Cancel();
         try
         {
@@ -150,14 +141,12 @@ else
             ApplyState(state);
             _revision = _savedRevision = 0;
             _remoteVersion = _version;
-            _activeStroke = null;
             _conflict = false;
             _importError = false;
             _error = null;
             _syncError = null;
             _result = null;
             _ready = true;
-            _canvas?.Invalidate();
             if (state.PendingImport)
                 await ImportPendingAsync(state);
         }
@@ -177,7 +166,7 @@ else
     }
 
     private bool CanRefresh => !_disposed && _ready && !_loading && !_busy && !_saving &&
-        !_conflict && _activeStroke is null && _revision == _savedRevision;
+        !_conflict && _sketch?.IsDrawing != true && _revision == _savedRevision;
 
     [JSInvokable]
     public Task OnBoardChanged(int version) => InvokeAsync(async () =>
@@ -200,17 +189,15 @@ else
     private void ApplyState(BoardState state)
     {
         Validate(state.Document);
-        if (state.Document.BackgroundPngBase64 != _document.BackgroundPngBase64)
-            ReplaceBackground(state.Document.BackgroundPngBase64 is { } png
-                ? SketchFile.DecodeBackground(png) : null);
+        _sketch?.DiscardStroke();
         _document = state.Document;
         _version = state.Version;
-        _canvas?.Invalidate();
     }
 
     private async Task ImportPendingAsync(BoardState state)
     {
         _importing = true;
+        _sketch?.DiscardStroke();
         _importError = false;
         _result = null;
         StateHasChanged();
@@ -218,12 +205,10 @@ else
         {
             var image = await Api.LoadPendingImageAsync(state.Version);
             var png = SketchFile.ImportImage(image);
-            var background = SketchFile.DecodeBackground(png);
+            using var background = SketchFile.DecodeBackground(png);
             _debounce?.Cancel();
             _document = new BoardDocument { Notes = state.Document.Notes, BackgroundPngBase64 = png };
-            ReplaceBackground(background);
             _revision++;
-            _canvas?.Invalidate();
             await SaveAsync();
             if (!_conflict && _savedRevision == _revision)
             {
@@ -277,114 +262,29 @@ else
         }
     }
 
-    private static void Validate(BoardDocument document)
+    private void Validate(BoardDocument document)
     {
         if (document.Width != 1200 || document.Height != 800 ||
             document.Strokes is null || document.Notes is null ||
-            document.Strokes.Count > MaxStrokes || document.Notes.Length > 10000 ||
-            document.Strokes.Any(s => s.Points is null || s.Points.Count > MaxPointsPerStroke ||
+            document.Strokes.Count > BoardDocument.MaxStrokes || document.Notes.Length > 10000 ||
+            document.Strokes.Any(s => s.Points is null || s.Points.Count > BoardDocument.MaxPointsPerStroke ||
                 s.Size is < 1 or > 100 || s.Tool is not ("pen" or "eraser")) ||
-            document.Strokes.Sum(s => s.Points.Count) > MaxPoints)
+            document.Strokes.Sum(s => s.Points.Count) > BoardDocument.MaxPoints)
             throw new InvalidOperationException("The saved board exceeds supported dimensions or limits.");
-    }
-
-    private void ReplaceBackground(SKImage? background)
-    {
-        var previous = _background;
-        _background = background;
-        previous?.Dispose();
-    }
-
-    private void Paint(SKPaintSurfaceEventArgs e)
-    {
-        var canvas = e.Surface.Canvas;
-        canvas.Save();
-        canvas.Scale(e.Info.Width / (float)_document.Width, e.Info.Height / (float)_document.Height);
-        BoardRenderer.Draw(canvas, _document, _activeStroke, _background);
-        canvas.Restore();
-    }
-
-    private void StartStroke(CanvasPosition point)
-    {
-        if (!_ready || _busy || _activeStroke is not null)
-            return;
-        if (_document.Strokes.Count >= MaxStrokes ||
-            _document.Strokes.Sum(s => s.Points.Count) >= MaxPoints)
+        if (document.BackgroundPngBase64 != _document.BackgroundPngBase64 &&
+            document.BackgroundPngBase64 is { } png)
         {
-            _error = "Board limit reached. Undo or clear strokes to continue.";
-            return;
+            using var background = SketchFile.DecodeBackground(png);
         }
-        _activeStroke = new BoardStroke { Tool = _tool, Color = _color, Size = _tool == "eraser" ? _size * 3 : _size };
-        AddPoint(point);
-    }
-
-    private void AddPoint(CanvasPosition point)
-    {
-        if (_activeStroke is null || _activeStroke.Points.Count >= MaxPointsPerStroke ||
-            _document.Strokes.Sum(s => s.Points.Count) + _activeStroke.Points.Count >= MaxPoints)
-            return;
-        var previous = _activeStroke.Points.LastOrDefault();
-        if (previous is not null && Math.Abs(previous.X - point.X) + Math.Abs(previous.Y - point.Y) < 0.7)
-            return;
-        _activeStroke.Points.Add(new BoardPoint { X = point.X, Y = point.Y });
-        _canvas?.Invalidate();
-    }
-
-    private void EndStroke(CanvasPosition point)
-    {
-        AddPoint(point);
-        FinishStroke();
     }
 
     private void DrawingError(string message) => _error = message;
-
-    private void CancelStroke()
-    {
-        if (_loading || _importing)
-        {
-            _activeStroke = null;
-            _canvas?.Invalidate();
-        }
-        else
-        {
-            FinishStroke();
-        }
-    }
-
-    private void FinishStroke()
-    {
-        if (_activeStroke is { Points.Count: > 0 } stroke)
-        {
-            _document.Strokes.Add(stroke);
-            Changed();
-        }
-        _activeStroke = null;
-        _canvas?.Invalidate();
-    }
-
-    private void Undo()
-    {
-        if (_activeStroke is not null)
-            FinishStroke();
-        if (_document.Strokes.Count == 0)
-            return;
-        _document.Strokes.RemoveAt(_document.Strokes.Count - 1);
-        Changed();
-        _canvas?.Invalidate();
-    }
+    private Task UndoAsync() => _sketch?.UndoAsync() ?? Task.CompletedTask;
 
     private void SelectPen() => _tool = "pen";
     private void SelectEraser() => _tool = "eraser";
 
-    private void Clear()
-    {
-        _activeStroke = null;
-        _document.Strokes.Clear();
-        _document.BackgroundPngBase64 = null;
-        ReplaceBackground(null);
-        Changed();
-        _canvas?.Invalidate();
-    }
+    private Task ClearAsync() => _sketch?.ClearAsync() ?? Task.CompletedTask;
 
     private void NotesChanged(ChangeEventArgs e)
     {
@@ -440,20 +340,13 @@ else
                     {
                         Version = _version,
                         Document = document,
-                        PngBase64 = BoardRenderer.ExportPngBase64(document, _background)
+                        PngBase64 = BoardRenderer.ExportPngBase64(document)
                     };
                     var saved = await Api.SaveAsync(request);
                     Validate(saved.Document);
                     _version = saved.Version;
                     _savedRevision = revision;
-                    if (_revision == revision && _activeStroke is null)
-                    {
-                        if (saved.Document.BackgroundPngBase64 != _document.BackgroundPngBase64)
-                            ReplaceBackground(saved.Document.BackgroundPngBase64 is { } png
-                                ? SketchFile.DecodeBackground(png) : null);
-                        _document = saved.Document;
-                        _canvas?.Invalidate();
-                    }
+                    // The server stores the submitted document unchanged; keep the instance being edited.
                     _error = null;
                 }
                 catch (BoardConflictException)
@@ -495,7 +388,6 @@ else
         _dotNetRef?.Dispose();
         if (_eventModule is not null)
             await _eventModule.DisposeAsync();
-        _background?.Dispose();
         _saveGate.Dispose();
     }
 }

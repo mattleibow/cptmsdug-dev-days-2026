@@ -3,6 +3,10 @@ namespace SketchToApp.Web.Models;
 // JSON uses camelCase in BoardApi; coordinates and dimensions are logical board pixels.
 public sealed class BoardDocument
 {
+    public const int MaxStrokes = 800;
+    public const int MaxPoints = 80000;
+    public const int MaxPointsPerStroke = 4000;
+
     public int Width { get; set; } = 1200;
     public int Height { get; set; } = 800;
     public List<BoardStroke> Strokes { get; set; } = [];

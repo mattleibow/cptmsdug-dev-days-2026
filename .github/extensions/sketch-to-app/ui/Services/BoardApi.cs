@@ -16,18 +16,18 @@ public sealed class BoardApi(HttpClient http)
         return await ReadAsync<BoardState>(response);
     }
 
-    public async Task<BoardState> SaveAsync(BoardState state)
+    public async Task<byte[]> LoadPendingImageAsync(int version)
     {
-        using var response = await http.PutAsJsonAsync("/api/state", state, JsonOptions);
+        using var response = await http.GetAsync($"/api/import-image?version={version}");
         EnsureSuccess(response);
-        return await ReadAsync<BoardState>(response);
+        return await response.Content.ReadAsByteArrayAsync();
     }
 
-    public async Task<BuildResult> BuildAsync(BuildRequest request)
+    public async Task<BoardState> SaveAsync(SaveRequest request)
     {
-        using var response = await http.PostAsJsonAsync("/api/build", request, JsonOptions);
+        using var response = await http.PutAsJsonAsync("/api/state", request, JsonOptions);
         EnsureSuccess(response);
-        return await ReadAsync<BuildResult>(response);
+        return await ReadAsync<BoardState>(response);
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)
@@ -47,4 +47,4 @@ public sealed class BoardApi(HttpClient http)
     }
 }
 
-public sealed class BoardConflictException() : Exception("This board changed in another window.");
+public sealed class BoardConflictException() : Exception("This board changed in chat or another window.");

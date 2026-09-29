@@ -18,16 +18,11 @@ button { cursor: pointer; border: 1px solid var(--border); border-radius: 7px; p
 button:hover:not(:disabled), button.selected { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
 button:disabled { cursor: not-allowed; opacity: .5; }
 button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.file-button { position: relative; display: inline-flex; align-items: center; min-height: 2.35rem; cursor: pointer; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; padding: .48rem .82rem; background: var(--panel); color: var(--foreground); }
-.file-button:hover:not(.disabled), .file-button:focus-within { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
-.file-button.disabled { opacity: .5; cursor: not-allowed; }
-.file-button input[type="file"] { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
 .app-shell { width: min(100%, 1530px); margin: 0 auto; padding: clamp(12px, 3vw, 32px); }
-.app-header { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem; }
+.app-header { margin-bottom: 1.5rem; }
 .app-header h1 { margin: .15rem 0 .45rem; font-size: clamp(1.5rem, 3vw, 2.1rem); }
 .eyebrow { color: var(--muted); letter-spacing: .13em; text-transform: uppercase; margin: 0; font-size: .78rem; }
 .intro, .hint { color: var(--muted); line-height: 1.5; margin: .2rem 0; }
-.build-button { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 650; white-space: nowrap; padding: .75rem 1.25rem; }
 .workspace { min-width: 0; }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem; padding: .75rem; background: var(--panel); border: 1px solid var(--border); border-radius: 10px 10px 0 0; }
 .toolbar label { display: inline-flex; align-items: center; gap: .4rem; font-size: .9rem; }
@@ -36,7 +31,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 .spacer { flex: 1; }
 .status { color: var(--muted); font-size: .85rem; }
 .board-frame { overflow: auto; background: var(--panel); border: 1px solid var(--border); border-top: 0; padding: clamp(4px, 1vw, 12px); border-radius: 0 0 10px 10px; }
-.board { position: relative; width: 100%; aspect-ratio: 3 / 2; background: white; overflow: hidden; }
+.board { position: relative; width: 100%; background: white; overflow: hidden; }
 .sketch-canvas, .pointer-layer { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
 .pointer-layer { touch-action: none; cursor: crosshair; }
 .notes-label { display: block; margin: 1.2rem 0 .45rem; font-weight: 600; }
@@ -49,7 +44,6 @@ textarea { display: block; width: 100%; resize: vertical; min-height: 100px; pad
 #blazor-error-ui { display: none; background: #7b2727; color: white; padding: 1rem; position: fixed; bottom: 0; width: 100%; }
 #blazor-error-ui a { color: white; }
 @media (max-width: 680px) {
-    .app-header { align-items: stretch; flex-direction: column; }
     .toolbar { gap: .4rem; }
     .status { width: 100%; }
     .board-frame { min-width: 0; }

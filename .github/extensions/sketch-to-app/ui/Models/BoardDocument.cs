@@ -43,18 +43,12 @@ public sealed class BoardState
 {
     public int Version { get; set; }
     public BoardDocument Document { get; set; } = new();
+    public bool PendingImport { get; set; }
 }
 
-public sealed class BuildRequest
+public sealed class SaveRequest
 {
     public int Version { get; set; }
     public BoardDocument Document { get; set; } = new();
     public string PngBase64 { get; set; } = "";
-}
-
-public sealed class BuildResult
-{
-    public string MessageId { get; set; } = "";
-    public string SnapshotPath { get; set; } = "";
-    public int Version { get; set; }
 }

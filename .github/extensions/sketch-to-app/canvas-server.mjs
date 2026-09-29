@@ -1,3 +1,5 @@
+// Host the Blazor canvas on loopback, publish it on first open, and expose board APIs.
+// This Node server owns HTTP and filesystem access that browser-side Blazor cannot use.
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -32,6 +34,7 @@ main { max-width: 36rem; margin: 3rem auto; } button { padding: .5rem 1rem; } pr
 </style></head>
 <body><main><h1>Preparing sketch canvas</h1><p id="message">Publishing the .NET 10 Blazor WebAssembly app for this session...</p><pre id="error"></pre><button id="retry" hidden>Retry build</button></main>
 <script>
+// Poll until the published Blazor app can replace this temporary page.
 async function check() {
   try {
     const response = await fetch("/api/status", { cache: "no-store" });
@@ -50,6 +53,7 @@ async function check() {
     document.getElementById("retry").hidden = false;
   }
 }
+// Allow retrying a failed publish without closing the canvas.
 document.getElementById("retry").onclick = async () => {
   document.getElementById("retry").hidden = true;
   document.getElementById("error").textContent = "";
@@ -65,8 +69,10 @@ document.getElementById("retry").onclick = async () => {
 check();
 </script></body></html>`;
 
+// Hash UI source files so unchanged builds can reuse their published output.
 async function fingerprint(directory) {
     const hash = createHash("sha256");
+    // Include the paths and contents of source files, but not build output.
     async function visit(path, relativePath) {
         const entries = (await readdir(path, { withFileTypes: true }))
             .filter((entry) => !["bin", "obj", "node_modules", ".git"].includes(entry.name))
@@ -86,6 +92,7 @@ async function fingerprint(directory) {
     return hash.digest("hex").slice(0, 20);
 }
 
+// Run the .NET publisher and report its diagnostics on failure.
 function publish(projectPath, destination) {
     return new Promise((resolve, reject) => {
         const args = ["publish", projectPath, "-c", "Release", "-o", destination, "--nologo", "-v", "quiet"];
@@ -104,9 +111,11 @@ function publish(projectPath, destination) {
     });
 }
 
+// Track the UI build and its ready or failed state.
 export class UiPublisher {
     #running = null;
 
+    // Configure the project and session artifact directory for publishing.
     constructor(projectPath, artifactDirectory, reportError = () => {}) {
         this.projectPath = projectPath;
         this.artifactDirectory = artifactDirectory;
@@ -116,6 +125,7 @@ export class UiPublisher {
         this.root = null;
     }
 
+    // Publish once, or reuse a completed build with the same source hash.
     start() {
         if (this.#running || this.status === "ready") return;
         this.status = "building";
@@ -146,11 +156,13 @@ export class UiPublisher {
         });
     }
 
+    // Restart publishing only after a failed attempt.
     retry() {
         if (this.status === "error") this.start();
     }
 }
 
+// Send a non-cached JSON response to the canvas browser.
 function reply(res, status, value) {
     const body = JSON.stringify(value);
     res.writeHead(status, {
@@ -162,6 +174,7 @@ function reply(res, status, value) {
     res.end(body);
 }
 
+// Enforce content type and request size before parsing an upload.
 async function requestJson(req, limit) {
     if (!/^application\/json(?:\s*;|$)/i.test(req.headers["content-type"] ?? "")) {
         throw new HttpError(415, "Expected Content-Type: application/json.");
@@ -184,6 +197,7 @@ async function requestJson(req, limit) {
     }
 }
 
+// Serve only files under the published UI directory.
 async function staticFile(req, res, publisher, pathname) {
     if (publisher.status !== "ready") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
@@ -220,7 +234,29 @@ async function staticFile(req, res, publisher, pathname) {
     createReadStream(file).on("error", (error) => res.destroy(error)).pipe(res);
 }
 
+// Start a loopback-only server for one canvas panel.
 export async function startCanvasServer({ store, publisher }) {
+    const subscribers = new Set();
+    // Announce changed versions to every open browser panel.
+    const unsubscribe = store.subscribe((version) => {
+        for (const res of subscribers) {
+            if (res.destroyed) {
+                subscribers.delete(res);
+            } else {
+                try {
+                    if (!res.write(`event: board\ndata: ${version}\n\n`)) {
+                        subscribers.delete(res);
+                        res.end();
+                    }
+                } catch (error) {
+                    subscribers.delete(res);
+                    process.stderr.write(`Sketch event stream failed: ${error}\n`);
+                    res.destroy();
+                }
+            }
+        }
+    });
+    // Route canvas API requests and static UI assets.
     const server = createServer(async (req, res) => {
         try {
             const host = `127.0.0.1:${server.address().port}`;
@@ -230,14 +266,36 @@ export async function startCanvasServer({ store, publisher }) {
                 reply(res, 200, { status: publisher.status, error: publisher.error });
             } else if (req.method === "GET" && pathname === "/api/state") {
                 reply(res, 200, await store.state());
+            } else if (req.method === "GET" && pathname === "/api/version") {
+                reply(res, 200, await store.version());
+            } else if (req.method === "GET" && pathname === "/api/events") {
+                res.writeHead(200, {
+                    "Content-Type": "text/event-stream; charset=utf-8",
+                    "Cache-Control": "no-cache, no-transform",
+                    "X-Content-Type-Options": "nosniff",
+                });
+                subscribers.add(res);
+                req.on("close", () => subscribers.delete(res));
+                const { version } = await store.version();
+                res.write(`event: board\ndata: ${version}\n\n`);
+            } else if (req.method === "GET" && pathname === "/api/import-image") {
+                const parameter = new URL(req.url, `http://${host}`).searchParams.get("version");
+                if (!parameter || !/^\d+$/.test(parameter))
+                    throw new HttpError(400, "A pending image version is required.");
+                const { bytes, mimeType } = await store.pendingImage(Number(parameter));
+                res.writeHead(200, {
+                    "Content-Type": mimeType,
+                    "Content-Length": bytes.length,
+                    "Cache-Control": "no-store",
+                    "X-Content-Type-Options": "nosniff",
+                });
+                res.end(bytes);
             } else if (["PUT", "POST"].includes(req.method) && pathname.startsWith("/api/")) {
                 if (req.headers.origin !== `http://${host}`) {
                     throw new HttpError(403, "Invalid canvas origin.");
                 }
                 if (pathname === "/api/state" && req.method === "PUT") {
-                    reply(res, 200, await store.save(await requestJson(req, 20 * 1024 * 1024)));
-                } else if (pathname === "/api/build" && req.method === "POST") {
-                    reply(res, 200, await store.build(await requestJson(req, 32 * 1024 * 1024)));
+                    reply(res, 200, await store.save(await requestJson(req, 32 * 1024 * 1024)));
                 } else if (pathname === "/api/retry" && req.method === "POST") {
                     publisher.retry();
                     reply(res, 200, { status: publisher.status });
@@ -258,17 +316,29 @@ export async function startCanvasServer({ store, publisher }) {
             }
         }
     });
-    await new Promise((resolve, reject) => {
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            server.off("error", reject);
-            resolve();
+    try {
+        await new Promise((resolve, reject) => {
+            server.once("error", reject);
+            server.listen(0, "127.0.0.1", () => {
+                server.off("error", reject);
+                resolve();
+            });
         });
-    });
+    } catch (error) {
+        unsubscribe();
+        throw error;
+    }
     return {
         server,
         url: `http://127.0.0.1:${server.address().port}/`,
-        close: () => new Promise((resolve, reject) =>
-            server.close((error) => error ? reject(error) : resolve())),
+        // End SSE streams so the panel server can close promptly.
+        close: () => {
+            unsubscribe();
+            for (const res of subscribers)
+                res.end();
+            subscribers.clear();
+            return new Promise((resolve, reject) =>
+                server.close((error) => error ? reject(error) : resolve()));
+        },
     };
 }

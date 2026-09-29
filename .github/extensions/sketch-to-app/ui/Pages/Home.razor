@@ -1,6 +1,7 @@
 @page "/"
 @using SkiaSharp
 @using SkiaSharp.Views.Blazor
+@using SketchToApp.Web.Components
 @using SketchToApp.Web.Models
 @using SketchToApp.Web.Services
 @implements IAsyncDisposable
@@ -12,12 +13,9 @@
 <header class="app-header">
     <div>
         <p class="eyebrow">Sketch to app</p>
-        <h1>Sketch an app screen</h1>
-        <p class="intro">Draw a screen or flow, add notes, then send the whole sketch to Copilot.</p>
+        <h1>Sketch whiteboard</h1>
+        <p class="intro">Draw freely. Ask Copilot in chat to load an image, read the board, save a PNG, or build from it.</p>
     </div>
-    <button class="build-button" disabled="@(!_ready || _busy || _conflict)" @onclick="BuildAsync">
-        @(_building ? "Building…" : "Build / update")
-    </button>
 </header>
 
 @if (!_ready)
@@ -44,33 +42,35 @@ else
             <label>Size <input type="range" min="2" max="28" value="@_size" disabled="@_busy" @oninput="e => _size = int.TryParse(e.Value?.ToString(), out var size) ? size : _size" /></label>
             <button disabled="@(_busy || _document.Strokes.Count == 0)" @onclick="Undo">Undo</button>
             <button disabled="@(_busy || (_document.Strokes.Count == 0 && _document.BackgroundPngBase64 is null))" @onclick="Clear">Clear board</button>
-            <button disabled="@_busy" @onclick="ExportAsync">Save PNG</button>
-            <label class="file-button @(_busy || _conflict ? "disabled" : "")">
-                Load image
-                <InputFile @key="_fileInputKey" OnChange="ImportAsync" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled="@(_busy || _conflict)" />
-            </label>
             <span class="spacer"></span>
             <span class="status" role="status">@(_importing ? "Importing…" : _saving ? "Saving…" : _revision == _savedRevision ? "Auto-saved" : "Unsaved changes")</span>
         </div>
 
         <div class="board-frame">
-            <div class="board" @ref="_board">
+            <TouchCanvas Width="_document.Width" Height="_document.Height"
+                         Disabled="@(_busy || _loading || _conflict)" Label="Freeform drawing surface"
+                         OnStart="StartStroke" OnMove="AddPoint" OnEnd="EndStroke"
+                         OnCancel="CancelStroke" OnError="DrawingError">
                 <SKCanvasView @ref="_canvas" class="sketch-canvas" IgnorePixelScaling="true" OnPaintSurface="Paint" />
-                <div class="pointer-layer" style="pointer-events:@(_busy ? "none" : "auto")"
-                     @onpointerdown="PointerDown" @onpointermove="PointerMove"
-                     @onpointerup="PointerUp" @onpointercancel="PointerCancel"
-                     aria-label="Freeform drawing surface"></div>
-            </div>
+            </TouchCanvas>
         </div>
 
         <label class="notes-label" for="board-notes">Notes for Copilot</label>
         <textarea id="board-notes" maxlength="10000" rows="4" disabled="@_busy"
                   placeholder="Describe interactions and anything the drawing cannot show."
                   value="@_document.Notes" @oninput="NotesChanged"></textarea>
-        <p class="hint">Auto-saved in this session. Save PNG downloads the whole board (not notes). Load image accepts PNG or JPEG and replaces the board and notes. Build / update sends the image and notes to Copilot.</p>
+        <p class="hint">The board and notes auto-save in this session. Ask Copilot in chat to view or save the PNG, load a PNG/JPEG, edit notes, or build an app from your sketch.</p>
     </section>
 }
 
+@if (!_eventsConnected && _ready)
+{
+    <section class="notice error" role="alert">Board updates disconnected. Reconnecting…</section>
+}
+@if (!string.IsNullOrWhiteSpace(_syncError))
+{
+    <section class="notice error" role="alert">@_syncError</section>
+}
 @if (!string.IsNullOrWhiteSpace(_error) && _ready)
 {
     <section class="notice error" role="alert">
@@ -79,7 +79,11 @@ else
         {
             <button @onclick="LoadAsync">Discard local changes and reload latest board</button>
         }
-        else if (!_importError)
+        else if (_importError)
+        {
+            <button disabled="@_busy" @onclick="LoadAsync">Retry image import</button>
+        }
+        else
         {
             <button disabled="@_busy" @onclick="RetrySaveAsync">Retry save</button>
         }
@@ -99,35 +103,41 @@ else
     private SKImage? _background;
     private BoardStroke? _activeStroke;
     private SKCanvasView? _canvas;
-    private ElementReference _board;
-    private IJSObjectReference? _pointerModule;
+    private IJSObjectReference? _eventModule;
+    private IJSObjectReference? _events;
+    private DotNetObjectReference<Home>? _dotNetRef;
     private CancellationTokenSource? _debounce;
-    private long? _pointerId;
     private long _revision;
     private long _savedRevision;
     private int _version;
-    private int _fileInputKey;
+    private int _remoteVersion;
     private int _size = 4;
     private string _tool = "pen";
     private string _color = "#273449";
     private string? _error;
+    private string? _syncError;
     private string? _result;
     private bool _ready;
     private bool _loading = true;
     private bool _saving;
-    private bool _building;
     private bool _importing;
     private bool _importError;
     private bool _conflict;
     private bool _disposed;
-    private bool _busy => _building || _importing;
+    private bool _refreshing;
+    private bool _eventsConnected = true;
+    private bool _busy => _importing;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
-            _pointerModule = await JS.InvokeAsync<IJSObjectReference>("import", "./board.js");
+        {
+            _eventModule = await JS.InvokeAsync<IJSObjectReference>("import", "./board.js");
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _events = await _eventModule.InvokeAsync<IJSObjectReference>("listenForChanges", _dotNetRef);
+        }
     }
 
     private async Task LoadAsync()
@@ -137,21 +147,19 @@ else
         try
         {
             var state = await Api.LoadAsync();
-            Validate(state.Document);
-            var background = state.Document.BackgroundPngBase64 is { } png
-                ? SketchFile.DecodeBackground(png) : null;
-            ReplaceBackground(background);
-            _document = state.Document;
-            _version = state.Version;
+            ApplyState(state);
             _revision = _savedRevision = 0;
+            _remoteVersion = _version;
             _activeStroke = null;
-            _pointerId = null;
             _conflict = false;
             _importError = false;
             _error = null;
+            _syncError = null;
             _result = null;
             _ready = true;
             _canvas?.Invalidate();
+            if (state.PendingImport)
+                await ImportPendingAsync(state);
         }
         catch (Exception ex)
         {
@@ -163,6 +171,109 @@ else
         finally
         {
             _loading = false;
+            if (_remoteVersion > _version && CanRefresh)
+                await RefreshIfChangedAsync();
+        }
+    }
+
+    private bool CanRefresh => !_disposed && _ready && !_loading && !_busy && !_saving &&
+        !_conflict && _activeStroke is null && _revision == _savedRevision;
+
+    [JSInvokable]
+    public Task OnBoardChanged(int version) => InvokeAsync(async () =>
+    {
+        if (_disposed)
+            return;
+        _remoteVersion = Math.Max(_remoteVersion, version);
+        await RefreshIfChangedAsync();
+    });
+
+    [JSInvokable]
+    public Task OnEventConnectionChanged(bool connected) => InvokeAsync(() =>
+    {
+        if (_disposed)
+            return;
+        _eventsConnected = connected;
+        StateHasChanged();
+    });
+
+    private void ApplyState(BoardState state)
+    {
+        Validate(state.Document);
+        if (state.Document.BackgroundPngBase64 != _document.BackgroundPngBase64)
+            ReplaceBackground(state.Document.BackgroundPngBase64 is { } png
+                ? SketchFile.DecodeBackground(png) : null);
+        _document = state.Document;
+        _version = state.Version;
+        _canvas?.Invalidate();
+    }
+
+    private async Task ImportPendingAsync(BoardState state)
+    {
+        _importing = true;
+        _importError = false;
+        _result = null;
+        StateHasChanged();
+        try
+        {
+            var image = await Api.LoadPendingImageAsync(state.Version);
+            var png = SketchFile.ImportImage(image);
+            var background = SketchFile.DecodeBackground(png);
+            _debounce?.Cancel();
+            _document = new BoardDocument { Notes = state.Document.Notes, BackgroundPngBase64 = png };
+            ReplaceBackground(background);
+            _revision++;
+            _canvas?.Invalidate();
+            await SaveAsync();
+            if (!_conflict && _savedRevision == _revision)
+            {
+                _error = null;
+                _result = "Image loaded from chat.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _importError = true;
+            _error = $"Could not load the chat image: {ex.Message} Ask chat to load another file or retry.";
+        }
+        finally
+        {
+            _importing = false;
+            StateHasChanged();
+            if (_remoteVersion > _version && CanRefresh)
+                await RefreshIfChangedAsync();
+        }
+    }
+
+    private async Task RefreshIfChangedAsync()
+    {
+        if (_refreshing || !CanRefresh || _remoteVersion <= _version)
+            return;
+        _refreshing = true;
+        try
+        {
+            while (CanRefresh && _remoteVersion > _version)
+            {
+                var revision = _revision;
+                var version = _version;
+                var state = await Api.LoadAsync();
+                if (!CanRefresh || _revision != revision || _version != version)
+                    return;
+                ApplyState(state);
+                _syncError = null;
+                if (state.PendingImport)
+                    await ImportPendingAsync(state);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            _syncError = $"Could not refresh the board from chat: {ex.Message} Reconnect or reload the panel.";
+        }
+        finally
+        {
+            _refreshing = false;
+            StateHasChanged();
         }
     }
 
@@ -193,11 +304,9 @@ else
         canvas.Restore();
     }
 
-    private async Task PointerDown(PointerEventArgs e)
+    private void StartStroke(CanvasPosition point)
     {
-        if (!_ready || _busy || _pointerId is not null || _pointerModule is null)
-            return;
-        if (e.PointerType == "mouse" && e.Button != 0)
+        if (!_ready || _busy || _activeStroke is not null)
             return;
         if (_document.Strokes.Count >= MaxStrokes ||
             _document.Strokes.Sum(s => s.Points.Count) >= MaxPoints)
@@ -205,40 +314,11 @@ else
             _error = "Board limit reached. Undo or clear strokes to continue.";
             return;
         }
-        _pointerId = e.PointerId;
         _activeStroke = new BoardStroke { Tool = _tool, Color = _color, Size = _tool == "eraser" ? _size * 3 : _size };
-        try
-        {
-            var point = await _pointerModule.InvokeAsync<BoardPoint>("start", _board, e.PointerId, e.ClientX, e.ClientY);
-            if (_pointerId == e.PointerId)
-                AddPoint(point);
-        }
-        catch (JSException ex)
-        {
-            _pointerId = null;
-            _activeStroke = null;
-            _error = $"Drawing could not start: {ex.Message}";
-        }
+        AddPoint(point);
     }
 
-    private async Task PointerMove(PointerEventArgs e)
-    {
-        if (_pointerId != e.PointerId || _activeStroke is null || _pointerModule is null)
-            return;
-        try
-        {
-            var point = await _pointerModule.InvokeAsync<BoardPoint>("point", _board, e.ClientX, e.ClientY);
-            if (_pointerId == e.PointerId)
-                AddPoint(point);
-        }
-        catch (JSException ex)
-        {
-            _error = $"Drawing interrupted: {ex.Message} Lift the pointer and retry.";
-            FinishStroke();
-        }
-    }
-
-    private void AddPoint(BoardPoint point)
+    private void AddPoint(CanvasPosition point)
     {
         if (_activeStroke is null || _activeStroke.Points.Count >= MaxPointsPerStroke ||
             _document.Strokes.Sum(s => s.Points.Count) + _activeStroke.Points.Count >= MaxPoints)
@@ -246,38 +326,33 @@ else
         var previous = _activeStroke.Points.LastOrDefault();
         if (previous is not null && Math.Abs(previous.X - point.X) + Math.Abs(previous.Y - point.Y) < 0.7)
             return;
-        _activeStroke.Points.Add(point);
+        _activeStroke.Points.Add(new BoardPoint { X = point.X, Y = point.Y });
         _canvas?.Invalidate();
     }
 
-    private async Task PointerUp(PointerEventArgs e)
+    private void EndStroke(CanvasPosition point)
     {
-        if (_pointerId != e.PointerId)
-            return;
-        if (_pointerModule is not null)
-        {
-            try
-            {
-                AddPoint(await _pointerModule.InvokeAsync<BoardPoint>("point", _board, e.ClientX, e.ClientY));
-                await _pointerModule.InvokeVoidAsync("end", _board, e.PointerId);
-            }
-            catch (JSException)
-            {
-                // A lost capture still commits the points already drawn.
-            }
-        }
+        AddPoint(point);
         FinishStroke();
     }
 
-    private void PointerCancel(PointerEventArgs e)
+    private void DrawingError(string message) => _error = message;
+
+    private void CancelStroke()
     {
-        if (_pointerId == e.PointerId)
+        if (_loading || _importing)
+        {
+            _activeStroke = null;
+            _canvas?.Invalidate();
+        }
+        else
+        {
             FinishStroke();
+        }
     }
 
     private void FinishStroke()
     {
-        _pointerId = null;
         if (_activeStroke is { Points.Count: > 0 } stroke)
         {
             _document.Strokes.Add(stroke);
@@ -304,7 +379,6 @@ else
     private void Clear()
     {
         _activeStroke = null;
-        _pointerId = null;
         _document.Strokes.Clear();
         _document.BackgroundPngBase64 = null;
         ReplaceBackground(null);
@@ -359,10 +433,16 @@ else
             while (_savedRevision != _revision && !_conflict)
             {
                 var revision = _revision;
-                var state = new BoardState { Version = _version, Document = _document.Copy() };
                 try
                 {
-                    var saved = await Api.SaveAsync(state);
+                    var document = _document.Copy();
+                    var request = new SaveRequest
+                    {
+                        Version = _version,
+                        Document = document,
+                        PngBase64 = BoardRenderer.ExportPngBase64(document, _background)
+                    };
+                    var saved = await Api.SaveAsync(request);
                     Validate(saved.Document);
                     _version = saved.Version;
                     _savedRevision = revision;
@@ -380,12 +460,12 @@ else
                 {
                     _importError = false;
                     _conflict = true;
-                    _error = "This board changed in another window. Copy any unsaved notes before reloading; reload the latest board to resolve the conflict.";
+                    _error = "This board changed in chat or another window. Copy any unsaved notes before reloading; reload the latest board to resolve the conflict.";
                 }
                 catch (Exception ex)
                 {
                     _importError = false;
-                    _error = $"Save failed: {ex.Message} Your edits remain on this page; retry before reloading or building.";
+                    _error = $"Save failed: {ex.Message} Your edits remain on this page; retry before reloading.";
                     break;
                 }
             }
@@ -396,130 +476,25 @@ else
             _saveGate.Release();
             StateHasChanged();
         }
+        if (_remoteVersion > _version && CanRefresh)
+            await RefreshIfChangedAsync();
     }
 
     private Task RetrySaveAsync() => SaveAsync();
-
-    private async Task ExportAsync()
-    {
-        if (_busy || !_ready)
-            return;
-        FinishStroke();
-        try
-        {
-            if (_pointerModule is null)
-                throw new InvalidOperationException("The download service is not ready. Retry in a moment.");
-            var png = BoardRenderer.ExportPngBase64(_document, _background);
-            await _pointerModule.InvokeVoidAsync("downloadPng", "sketch-to-app.png", png);
-            _error = null;
-            _result = "PNG downloaded. Notes stay in this session.";
-        }
-        catch (Exception ex)
-        {
-            _importError = false;
-            _error = $"Could not download the sketch: {ex.Message} Try Save PNG again.";
-        }
-    }
-
-    private async Task ImportAsync(InputFileChangeEventArgs e)
-    {
-        if (_busy || _conflict || !_ready)
-            return;
-        _importing = true;
-        _importError = false;
-        _result = null;
-        try
-        {
-            var file = e.File;
-            if (file.Size > SketchFile.MaxFileBytes)
-                throw new InvalidDataException("The image is too large (maximum 8 MiB).");
-            await using var stream = file.OpenReadStream(SketchFile.MaxFileBytes);
-            using var buffer = new MemoryStream();
-            await stream.CopyToAsync(buffer);
-            var png = SketchFile.ImportImage(buffer.ToArray());
-
-            if (!await JS.InvokeAsync<bool>("confirm",
-                "Load this image? It will replace the current board, clear existing strokes and notes, and save the new background to this session."))
-                return;
-
-            var background = SketchFile.DecodeBackground(png);
-            _debounce?.Cancel();
-            _activeStroke = null;
-            _pointerId = null;
-            _document = new BoardDocument { BackgroundPngBase64 = png };
-            ReplaceBackground(background);
-            _revision++;
-            _canvas?.Invalidate();
-            await SaveAsync();
-            if (_savedRevision == _revision && !_conflict)
-                _result = "Image loaded and saved to this session.";
-        }
-        catch (Exception ex)
-        {
-            _importError = true;
-            _error = $"Could not load sketch: {ex.Message} Choose a valid PNG or JPEG image and try again.";
-        }
-        finally
-        {
-            _importing = false;
-            _fileInputKey++;
-        }
-    }
-
-    private async Task BuildAsync()
-    {
-        if (_busy || !_ready || _conflict)
-            return;
-        FinishStroke();
-        _building = true;
-        _result = null;
-        _debounce?.Cancel();
-        try
-        {
-            await SaveAsync();
-            if (_savedRevision != _revision || _conflict)
-                return;
-
-            await _saveGate.WaitAsync();
-            try
-            {
-                var document = _document.Copy();
-                var png = BoardRenderer.ExportPngBase64(document, _background);
-                var result = await Api.BuildAsync(new BuildRequest
-                {
-                    Version = _version, Document = document, PngBase64 = png
-                });
-                _version = result.Version;
-                _error = null;
-                _result = "Sketch sent to Copilot. Follow the chat to see the app update.";
-            }
-            finally
-            {
-                _saveGate.Release();
-            }
-        }
-        catch (BoardConflictException)
-        {
-            _conflict = true;
-            _error = "This board changed in another window. Copy any unsaved notes before reloading, then reload the latest board.";
-        }
-        catch (Exception ex)
-        {
-            _error = $"Build failed: {ex.Message} Your board is still here; retry Build / update.";
-        }
-        finally
-        {
-            _building = false;
-        }
-    }
 
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
         _debounce?.Cancel();
         _debounce?.Dispose();
-        if (_pointerModule is not null)
-            await _pointerModule.DisposeAsync();
+        if (_events is not null)
+        {
+            await _events.InvokeVoidAsync("close");
+            await _events.DisposeAsync();
+        }
+        _dotNetRef?.Dispose();
+        if (_eventModule is not null)
+            await _eventModule.DisposeAsync();
         _background?.Dispose();
         _saveGate.Dispose();
     }

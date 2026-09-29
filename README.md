@@ -11,7 +11,7 @@ Choose **one** as the app you're building; they are alternative starting points,
 
 ## Canvases
 
-- **[Sketch to app](.github/extensions/sketch-to-app/README.md)** is included in this repository. Draw or load a screen, add notes, and send the sketch to Copilot to build the app you chose above. Its controls and implementation walkthrough live with the extension.
+- **[Sketch to app](.github/extensions/sketch-to-app/README.md)** is included in this repository. Draw on the whiteboard and use chat to load or save images, edit notes, and build the app you chose above from the saved sketch. Its controls and implementation walkthrough live with the extension.
 - **[Mobile Device](https://github.com/Redth/mobile-canvas-ghcp)** is a separate `mobile-canvas` plugin for previewing and interacting with an Android emulator or iOS Simulator after building the app. To use it in the GitHub Copilot app, open **Customize → Plugins**, add the `Redth/mobile-canvas-ghcp` marketplace, install **mobile-canvas**, and reload Copilot. Android requires an Android SDK; iOS requires macOS and Xcode.
 
 The project canvas is available from the checkout, but the third-party Mobile Device plugin is a **per-user install**, not something Git checkout runs automatically. Review the plugin before installing it.

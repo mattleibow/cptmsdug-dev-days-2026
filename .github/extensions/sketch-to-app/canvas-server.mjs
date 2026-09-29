@@ -23,6 +23,9 @@ const MIME = {
     ".woff": "font/woff",
     ".woff2": "font/woff2",
 };
+const TEXT_SOURCE_EXTENSIONS = new Set([
+    ".cs", ".csproj", ".css", ".html", ".js", ".json", ".props", ".razor", ".svg", ".targets", ".xml",
+]);
 
 const LOADING_HTML = `<!doctype html>
 <html lang="en">
@@ -70,7 +73,7 @@ check();
 </script></body></html>`;
 
 // Hash UI source files so unchanged builds can reuse their published output.
-async function fingerprint(directory) {
+export async function fingerprint(directory) {
     const hash = createHash("sha256");
     // Include the paths and contents of source files, but not build output.
     async function visit(path, relativePath) {
@@ -84,7 +87,9 @@ async function fingerprint(directory) {
                 await visit(full, name);
             } else if (entry.isFile()) {
                 hash.update(name);
-                hash.update(await readFile(full));
+                const bytes = await readFile(full);
+                hash.update(TEXT_SOURCE_EXTENSIONS.has(extname(name).toLowerCase())
+                    ? Buffer.from(bytes.toString("utf8").replace(/\r\n/g, "\n")) : bytes);
             }
         }
     }
@@ -93,7 +98,7 @@ async function fingerprint(directory) {
 }
 
 // Run the .NET publisher and report its diagnostics on failure.
-function publish(projectPath, destination) {
+export function publish(projectPath, destination) {
     return new Promise((resolve, reject) => {
         const args = ["publish", projectPath, "-c", "Release", "-o", destination, "--nologo", "-v", "quiet"];
         const child = spawn("dotnet", args, { windowsHide: true });
@@ -111,7 +116,7 @@ function publish(projectPath, destination) {
     });
 }
 
-// Track the UI build and its ready or failed state.
+// Prefer the matching checked-in UI; otherwise publish once per source version.
 export class UiPublisher {
     #running = null;
 
@@ -127,11 +132,23 @@ export class UiPublisher {
 
     // Publish once, or reuse a completed build with the same source hash.
     start() {
-        if (this.#running || this.status === "ready") return;
+        if (this.#running || this.status === "ready") return this.#running;
         this.status = "building";
         this.error = null;
         this.#running = (async () => {
             const hash = await fingerprint(dirname(this.projectPath));
+            const bundled = join(dirname(this.projectPath), "..", "prebuilt");
+            try {
+                const bundledHash = (await readFile(join(bundled, "source.hash"), "utf8")).trim();
+                if (bundledHash === hash) {
+                    await access(join(bundled, "wwwroot", "index.html"));
+                    this.root = join(bundled, "wwwroot");
+                    this.status = "ready";
+                    return;
+                }
+            } catch (error) {
+                if (error.code !== "ENOENT") throw error;
+            }
             const output = join(this.artifactDirectory, "published", hash);
             const index = join(output, "wwwroot", "index.html");
             const marker = join(output, ".ready");
@@ -154,6 +171,7 @@ export class UiPublisher {
         }).finally(() => {
             this.#running = null;
         });
+        return this.#running;
     }
 
     // Restart publishing only after a failed attempt.

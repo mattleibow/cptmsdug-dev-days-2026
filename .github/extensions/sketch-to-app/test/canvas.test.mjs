@@ -1,12 +1,13 @@
 // Verify session board persistence, snapshot retrieval, and the loopback API.
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
-import { startCanvasServer } from "../canvas-server.mjs";
+import { fingerprint, startCanvasServer, UiPublisher } from "../canvas-server.mjs";
 import { decodeSnapshot, emptyDocument, HttpError, SketchStore, validateDocument } from "../document-store.mjs";
 import { end, point, start } from "../ui/wwwroot/touch-canvas.js";
 
@@ -78,6 +79,57 @@ test("TouchCanvas maps pointer positions and releases capture independently of s
     end(board, 5);
     assert.throws(() => point({ getBoundingClientRect: () => ({ width: 0, height: 10 }) },
         1, 1, 1200, 800), /no size/);
+});
+
+test("the bundled UI is current and contains only served assets", async () => {
+    const extension = fileURLToPath(new URL("../", import.meta.url));
+    const bundle = join(extension, "prebuilt");
+    assert.equal((await readFile(join(bundle, "source.hash"), "utf8")).trim(),
+        await fingerprint(join(extension, "ui")));
+    assert.match(await readFile(join(bundle, "wwwroot", "index.html"), "utf8"),
+        /blazor\.webassembly/);
+    const assets = await readdir(join(bundle, "wwwroot", "_framework"));
+    assert.ok(assets.some((name) => name.endsWith(".wasm")));
+    assert.ok(assets.every((name) => !/\.(?:br|gz|map)$/.test(name)));
+    assert.ok(assets.every((name) => !name.startsWith("icudt_")));
+});
+
+test("a matching bundle loads without publishing, while changed UI uses the cached build", async (t) => {
+    const directory = await temporary(t);
+    const ui = join(directory, "ui");
+    const bundle = join(directory, "prebuilt");
+    const artifacts = join(directory, "artifacts");
+    const project = join(ui, "SketchToApp.Web.csproj");
+    const source = join(ui, "Home.razor");
+    await mkdir(ui);
+    await mkdir(join(bundle, "wwwroot"), { recursive: true });
+    await writeFile(project, "<Project />");
+    await writeFile(source, "Before\r\n");
+    const hash = await fingerprint(ui);
+    await writeFile(join(bundle, "source.hash"), `${hash}\n`);
+    await writeFile(join(bundle, "wwwroot", "index.html"), "<h1>Bundled</h1>");
+
+    const bundled = new UiPublisher(project, artifacts);
+    await bundled.start();
+    assert.equal(bundled.status, "ready");
+    assert.equal(bundled.root, join(bundle, "wwwroot"));
+    const entry = await startCanvasServer({ store: new SketchStore(join(directory, "board")), publisher: bundled });
+    t.after(() => entry.close());
+    assert.match(await (await fetch(entry.url)).text(), /Bundled/);
+
+    await writeFile(source, "Before\n");
+    assert.equal(await fingerprint(ui), hash);
+    await writeFile(source, "After\n");
+    const changedHash = await fingerprint(ui);
+    assert.notEqual(changedHash, hash);
+    const cached = join(artifacts, "published", changedHash);
+    await mkdir(join(cached, "wwwroot"), { recursive: true });
+    await writeFile(join(cached, ".ready"), changedHash);
+    await writeFile(join(cached, "wwwroot", "index.html"), "<h1>Rebuilt</h1>");
+    const rebuilt = new UiPublisher(project, artifacts);
+    await rebuilt.start();
+    assert.equal(rebuilt.status, "ready");
+    assert.equal(rebuilt.root, join(cached, "wwwroot"));
 });
 
 test("board state persists across store instances and rejects stale writes", async (t) => {

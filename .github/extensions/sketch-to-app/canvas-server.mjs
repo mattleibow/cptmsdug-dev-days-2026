@@ -35,7 +35,7 @@ const LOADING_HTML = `<!doctype html>
 body { margin: 0; padding: 2rem; background: var(--background-color-default, #fff); color: var(--text-color-default, #1f2328); font: var(--text-body-medium, 14px) var(--font-sans, sans-serif); }
 main { max-width: 36rem; margin: 3rem auto; } button { padding: .5rem 1rem; } pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 </style></head>
-<body><main><h1>Preparing sketch canvas</h1><p id="message">Publishing the .NET 10 Blazor WebAssembly app for this session...</p><pre id="error"></pre><button id="retry" hidden>Retry build</button></main>
+<body><main><h1>Preparing sketch canvas</h1><p id="message">Publishing the .NET 11 Blazor WebAssembly app for this session...</p><pre id="error"></pre><button id="retry" hidden>Retry build</button></main>
 <script>
 // Poll until the published Blazor app can replace this temporary page.
 async function check() {

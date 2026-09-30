@@ -1,4 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
+#if DEBUG
+using Microsoft.Maui.DevFlow.Agent;
+using Microsoft.Maui.DevFlow.Blazor;
+#endif
 
 namespace MauiBlazorDemo;
 
@@ -19,6 +23,8 @@ public static class MauiProgram
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
+		builder.AddMauiDevFlowAgent();
+		builder.AddMauiBlazorDevFlowTools();
 #endif
 
 		return builder.Build();

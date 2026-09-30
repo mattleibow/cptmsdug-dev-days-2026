@@ -1,10 +1,10 @@
 # Sketch to app canvas
 
-This project-scoped Copilot canvas is a .NET 10 Blazor WebAssembly whiteboard using SkiaSharp. Draw and type in the panel; ask Copilot in chat to inspect, import, or export an image with its notes, edit notes, or build an app from the sketch. No panel button starts a build or sends a chat message.
+This project-scoped Copilot canvas is a .NET 11 Blazor WebAssembly whiteboard using SkiaSharp. Draw and type in the panel; ask Copilot in chat to inspect, import, or export an image with its notes, edit notes, or build an app from the sketch. No panel button starts a build or sends a chat message.
 
 ## Build an app live
 
-1. In a Copilot project session, choose the app to build: [`MauiXamlDemo`](../../../demos/MauiXamlDemo) (native XAML) or [`MauiBlazorDemo`](../../../demos/MauiBlazorDemo) (Blazor Hybrid). They are blank .NET 10 template apps already in the repo; you do not need `dotnet new` on stage.
+1. In a Copilot project session, choose the app to build: [`MauiXamlDemo`](../../../demos/MauiXamlDemo) (native XAML) or [`MauiBlazorDemo`](../../../demos/MauiBlazorDemo) (Blazor Hybrid). They are blank .NET 11 template apps already in the repo; you do not need `dotnet new` on stage.
 2. Reload extensions and open **Sketch to app** (`sketch-to-app`) before presenting. The matching prebuilt Blazor UI is checked in, so it opens without a .NET build. If you edited the UI but did not regenerate the bundle, opening it publishes the new version locally instead; a failed publish shows **Retry build**.
 3. Draw with **Pen**, **Color**, and **Size**, or ask chat to load a PNG/JPEG from the repository or the session's attachments into the board. **Eraser**, **Undo**, and **Clear board** help revise it.
 4. Add notes in the panel or ask Copilot to add or replace them. After the board says **Auto-saved**, ask chat to show or describe the sketch; Copilot reads the PNG and notes without editing an app. Ask it to “export this board to `designs\login-screen`” to create `designs\login-screen.png` and `designs\login-screen.md`. When ready, say “build this screen in MauiXamlDemo” (or the app you chose), and Copilot uses the latest snapshot to do the work.
@@ -25,7 +25,11 @@ The flow is **chat import or draw → auto-save → chat inspect, edit, or expor
 
 ## Update the prebuilt UI
 
-After editing anything under `ui/`, regenerate and commit the prebuilt bundle along with the source. From the repository root, with the .NET 10 SDK and Node.js installed:
+After editing anything under `ui/`, regenerate and commit the prebuilt bundle along with the source. From the repository root, with the .NET 11 SDK and Node.js installed:
+
+Install the `wasm-tools` workload for native relinking. SkiaSharp is pinned to
+`4.151.2` because the newer native WebAssembly assets regress .NET 11 toolchain
+compatibility (see [mono/SkiaSharp#4440](https://github.com/mono/SkiaSharp/issues/4440)).
 
 ```powershell
 node .github\extensions\sketch-to-app\build-prebuilt.mjs

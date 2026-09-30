@@ -1,4 +1,4 @@
-// Regenerate the checked-in browser assets from the current .NET 10 UI source.
+// Regenerate the checked-in browser assets from the current .NET 11 UI source.
 import { cp, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";

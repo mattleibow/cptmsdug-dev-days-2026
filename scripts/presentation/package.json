@@ -1,0 +1,12 @@
+{
+  "name": "dev-days-presentation-builder",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:keynote-wireframe": "node build-keynote-wireframe.mjs"
+  },
+  "dependencies": {
+    "pptxgenjs": "4.0.1",
+    "qrcode": "1.5.4"
+  }
+}

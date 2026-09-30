@@ -6,3 +6,14 @@
 TestResults/
 .playwright-mcp/
 prebuilt/.build/
+
+.DS_Store
+__pycache__/
+*.py[cod]
+*.tmp
+*~
+~$*.pptx
+node_modules/
+scripts/presentation/.keynote-work/
+scripts/presentation/.keynote-source-media/
+scripts/presentation/.keynote-qa/

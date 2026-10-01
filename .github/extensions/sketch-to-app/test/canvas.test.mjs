@@ -1,7 +1,7 @@
 // Verify session board persistence, snapshot retrieval, and the loopback API.
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -10,6 +10,15 @@ import { deflateSync } from "node:zlib";
 import { fingerprint, startCanvasServer, UiPublisher } from "../canvas-server.mjs";
 import { decodeSnapshot, emptyDocument, HttpError, SketchStore, validateDocument } from "../document-store.mjs";
 import { end, point, start } from "../ui/wwwroot/touch-canvas.js";
+
+async function directoryBytes(directory) {
+    let bytes = 0;
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const path = join(directory, entry.name);
+        bytes += entry.isDirectory() ? await directoryBytes(path) : (await stat(path)).size;
+    }
+    return bytes;
+}
 
 // Compute PNG chunk checksums for image-validation tests.
 function crc32(bytes) {
@@ -81,23 +90,54 @@ test("TouchCanvas maps pointer positions and releases capture independently of s
         1, 1, 1200, 800), /no size/);
 });
 
-test("the bundled UI is current and contains only served assets", async () => {
+test("project extensions stay below the app's 8 MiB limit", async () => {
+    const extensions = fileURLToPath(new URL("../../", import.meta.url));
+    const bytes = await directoryBytes(extensions);
+    assert.ok(bytes <= 8388608, `Project extensions contain ${bytes} bytes; limit is 8388608.`);
+});
+
+test("the external bundled UI is current and serves its WebAssembly assets", async (t) => {
     const extension = fileURLToPath(new URL("../", import.meta.url));
-    const bundle = join(extension, "prebuilt");
+    const ui = join(extension, "ui");
+    const bundle = join(extension, "..", "..", "..", "prebuilt", "sketch-to-app");
     assert.equal((await readFile(join(bundle, "source.hash"), "utf8")).trim(),
-        await fingerprint(join(extension, "ui")));
-    assert.match(await readFile(join(bundle, "wwwroot", "index.html"), "utf8"),
-        /blazor\.webassembly/);
+        await fingerprint(ui));
+    const html = await readFile(join(bundle, "wwwroot", "index.html"), "utf8");
+    assert.match(html, /blazor\.webassembly/);
     const assets = await readdir(join(bundle, "wwwroot", "_framework"));
     assert.ok(assets.some((name) => name.endsWith(".wasm")));
     assert.ok(assets.every((name) => !/\.(?:br|gz|map)$/.test(name)));
     assert.ok(assets.every((name) => !name.startsWith("icudt_")));
+    const bootstrap = /href="_framework\/(dotnet\.[^"]+\.js)"/.exec(html)?.[1];
+    assert.ok(bootstrap, "The published HTML must reference the fingerprinted .NET bootstrap.");
+    const bootScript = await readFile(join(bundle, "wwwroot", "_framework", bootstrap), "utf8");
+    const resources = [...bootScript.matchAll(/"name":\s*"([^"]+)"/g)].map((match) => match[1]);
+    assert.ok(resources.length > 0, "The bootstrap must contain its resource manifest.");
+    const referenced = new Set([bootstrap, "blazor.webassembly.js", ...resources]);
+    assert.deepEqual([...referenced].sort(), assets.sort(),
+        "Every boot resource must exist, with no obsolete framework assets left over.");
+
+    const publisher = new UiPublisher(join(ui, "SketchToApp.Web.csproj"), bundle, await temporary(t));
+    await publisher.start();
+    assert.equal(publisher.status, "ready", publisher.error);
+    assert.equal(publisher.root, join(bundle, "wwwroot"));
+    const entry = await startCanvasServer({
+        store: new SketchStore(await temporary(t)), publisher,
+    });
+    t.after(() => entry.close());
+    assert.match(await (await fetch(entry.url)).text(), /blazor\.webassembly/);
+    const wasm = assets.find((name) => name.endsWith(".wasm"));
+    const response = await fetch(new URL(`_framework/${wasm}`, entry.url));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "application/wasm");
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()),
+        await readFile(join(bundle, "wwwroot", "_framework", wasm)));
 });
 
 test("a matching bundle loads without publishing, while changed UI uses the cached build", async (t) => {
     const directory = await temporary(t);
     const ui = join(directory, "ui");
-    const bundle = join(directory, "prebuilt");
+    const bundle = join(directory, "prebuilt", "sketch-to-app");
     const artifacts = join(directory, "artifacts");
     const project = join(ui, "SketchToApp.Web.csproj");
     const source = join(ui, "Home.razor");
@@ -108,8 +148,9 @@ test("a matching bundle loads without publishing, while changed UI uses the cach
     const hash = await fingerprint(ui);
     await writeFile(join(bundle, "source.hash"), `${hash}\n`);
     await writeFile(join(bundle, "wwwroot", "index.html"), "<h1>Bundled</h1>");
+    assert.equal(await fingerprint(ui), hash);
 
-    const bundled = new UiPublisher(project, artifacts);
+    const bundled = new UiPublisher(project, bundle, artifacts);
     await bundled.start();
     assert.equal(bundled.status, "ready");
     assert.equal(bundled.root, join(bundle, "wwwroot"));
@@ -126,7 +167,7 @@ test("a matching bundle loads without publishing, while changed UI uses the cach
     await mkdir(join(cached, "wwwroot"), { recursive: true });
     await writeFile(join(cached, ".ready"), changedHash);
     await writeFile(join(cached, "wwwroot", "index.html"), "<h1>Rebuilt</h1>");
-    const rebuilt = new UiPublisher(project, artifacts);
+    const rebuilt = new UiPublisher(project, bundle, artifacts);
     await rebuilt.start();
     assert.equal(rebuilt.status, "ready");
     assert.equal(rebuilt.root, join(cached, "wwwroot"));

@@ -5,9 +5,10 @@ import { fileURLToPath } from "node:url";
 import { fingerprint, publish } from "./canvas-server.mjs";
 
 const extensionDirectory = dirname(fileURLToPath(import.meta.url));
+const repositoryDirectory = join(extensionDirectory, "..", "..", "..");
 const uiDirectory = join(extensionDirectory, "ui");
 const projectPath = join(uiDirectory, "SketchToApp.Web.csproj");
-const bundle = join(extensionDirectory, "prebuilt");
+const bundle = join(repositoryDirectory, "prebuilt", "sketch-to-app");
 
 async function measure(directory) {
     let bytes = 0;
@@ -26,8 +27,9 @@ async function measure(directory) {
     return { bytes, files };
 }
 
-await mkdir(join(uiDirectory, "obj"), { recursive: true });
-const staging = await mkdtemp(join(uiDirectory, "obj", "prebuilt-"));
+const stagingDirectory = join(repositoryDirectory, "prebuilt", ".build");
+await mkdir(stagingDirectory, { recursive: true });
+const staging = await mkdtemp(join(stagingDirectory, "sketch-to-app-"));
 let preserveStaging = false;
 try {
     const hash = await fingerprint(uiDirectory);

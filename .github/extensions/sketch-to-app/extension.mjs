@@ -222,6 +222,7 @@ if (session.workspacePath) {
     store = new SketchStore(directory);
     publisher = new UiPublisher(
         join(extensionDirectory, "ui", "SketchToApp.Web.csproj"),
+        join(repositoryDirectory, "prebuilt", "sketch-to-app"),
         directory,
         // Surface publish errors in chat rather than writing to RPC stdout.
         (error) => {

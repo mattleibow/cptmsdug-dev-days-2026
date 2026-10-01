@@ -100,7 +100,8 @@ export async function fingerprint(directory) {
 // Run the .NET publisher and report its diagnostics on failure.
 export function publish(projectPath, destination) {
     return new Promise((resolve, reject) => {
-        const args = ["publish", projectPath, "-c", "Release", "-o", destination, "--nologo", "-v", "quiet"];
+        const args = ["publish", projectPath, "-c", "Release", "-o", destination,
+            "--artifacts-path", join(destination, "artifacts"), "--nologo", "-v", "quiet"];
         const child = spawn("dotnet", args, { windowsHide: true });
         let output = "";
         for (const stream of [child.stdout, child.stderr]) {
@@ -121,8 +122,9 @@ export class UiPublisher {
     #running = null;
 
     // Configure the project and session artifact directory for publishing.
-    constructor(projectPath, artifactDirectory, reportError = () => {}) {
+    constructor(projectPath, bundleDirectory, artifactDirectory, reportError = () => {}) {
         this.projectPath = projectPath;
+        this.bundleDirectory = bundleDirectory;
         this.artifactDirectory = artifactDirectory;
         this.reportError = reportError;
         this.status = "building";
@@ -137,7 +139,7 @@ export class UiPublisher {
         this.error = null;
         this.#running = (async () => {
             const hash = await fingerprint(dirname(this.projectPath));
-            const bundled = join(dirname(this.projectPath), "..", "prebuilt");
+            const bundled = this.bundleDirectory;
             try {
                 const bundledHash = (await readFile(join(bundled, "source.hash"), "utf8")).trim();
                 if (bundledHash === hash) {

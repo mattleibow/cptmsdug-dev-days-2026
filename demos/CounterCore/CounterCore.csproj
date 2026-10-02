@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Settings\CounterSettings.json" LogicalName="CounterCore.counter-settings.json" />
+  </ItemGroup>
+
 </Project>

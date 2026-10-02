@@ -76,15 +76,6 @@ jobs:
       - name: Set NuGet cache path
         run: '"NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV'
 
-      - name: Cache NuGet packages
-        if: runner.os != 'Windows'
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.NUGET_PACKAGES }}
-          key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-nuget-v2-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-nuget-v2-${{ hashFiles('global.json') }}-
-
       - name: Restore solution
         run: >-
           dotnet restore MauiDemos.slnx

@@ -63,3 +63,16 @@ To build both demos for the current operating system:
 dotnet workload restore MauiDemos.slnx
 dotnet build MauiDemos.slnx --configuration Debug
 ```
+
+Each CI job uploads its Android dependency and solution build binlogs as a
+`binlogs-<os>` artifact, including failed builds, with seven-day retention.
+The build also prints MSBuild target and task timing summaries.
+Download an artifact and inspect it with the repository's pinned local tool:
+
+```powershell
+dotnet tool restore
+dotnet tool run binlogtool -- search <path-to-build.binlog> '$task'
+```
+
+Binlogs can contain build properties and environment values. Imported project
+files are excluded from these CI logs, but review logs before sharing them.

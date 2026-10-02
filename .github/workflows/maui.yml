@@ -64,6 +64,7 @@ jobs:
           -p:AndroidSdkDirectory="$env:ANDROID_HOME"
           -p:JavaSdkDirectory="$env:JAVA_HOME"
           -p:AcceptAndroidSDKLicenses=True
+          "-bl:artifacts/android-dependencies.binlog;ProjectImports=None"
 
       - name: Build solution
         run: >-
@@ -72,3 +73,14 @@ jobs:
           -p:EnableCodeSigning=false
           -p:AndroidSdkDirectory="$env:ANDROID_HOME"
           -p:JavaSdkDirectory="$env:JAVA_HOME"
+          "-bl:artifacts/build.binlog;ProjectImports=None"
+          -clp:PerformanceSummary
+
+      - name: Upload build binlogs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: binlogs-${{ matrix.os }}
+          path: artifacts/*.binlog
+          if-no-files-found: warn
+          retention-days: 7

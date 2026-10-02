@@ -17,7 +17,7 @@
   does not validate an interaction. Do not use `--no-build` after source changes.
 - Select the project and platform from the user's request and the execution
   host. For local runtime testing, do not attempt Apple targets on Windows or
-  Windows targets on macOS. CI's Windows Apple builds are compilation-only.
+  Windows targets on macOS.
 - Restrict `TargetFrameworks` to the selected target so unrelated platform
   workloads are not required. Use Debug for live inspection.
 - For Android and iOS, discover available devices first and set `$device` to
@@ -95,15 +95,17 @@ dotnet run `
 - `.github/workflows/maui.yml` builds both demos through `MauiDemos.slnx`.
   Automatic runs are limited to pushes to `main` and PRs targeting `main`;
   PRs build only on macOS for faster feedback. Pushes to `main` and manual
-  dispatch build on Linux, macOS, and Windows. Windows coverage is post-merge,
-  not a PR gate.
+  dispatch build on Linux, macOS, and Windows. Android and Windows coverage is
+  post-merge, not a PR gate.
 - Keep the matrix OS-only. Each project selects Android on Linux,
-  Android/iOS/Mac Catalyst on macOS, and all four targets on Windows.
-  Windows Apple targets provide compilation coverage, not runnable bundles.
+  Android/Windows on Windows, and iOS/Mac Catalyst on macOS. This is an intentional
+  demo split, not a statement of host capabilities. Local Windows builds do not
+  validate Apple implementations; macOS PR CI catches platform contract drift.
 - `global.json` sets .NET 11 RC1 as the minimum and rolls forward to the latest
   installed .NET 11.0 SDK, including previews and feature bands. CI's
   `setup-dotnet` installs the exact prerelease SDK specified there.
-- CI installs the solution's workloads, Java 21, and Android SDK components.
+- CI installs the solution's workloads. Only Linux/Windows set up Java 21,
+  Android SDK components, and Android dependency builds.
   macOS selects Xcode 26.6 for RC1 and uses the default iOS runtime identifier;
   there is no explicit simulator override. Mac Catalyst requires minimum 17.0.
   Builds use Debug (including DevFlow), `ContinuousIntegrationBuild=true`, and

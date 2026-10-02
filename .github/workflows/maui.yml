@@ -51,12 +51,14 @@ jobs:
           global-json-file: global.json
 
       - name: Set up Java
+        if: runner.os != 'macOS'
         uses: actions/setup-java@v5
         with:
           distribution: microsoft
           java-version: '21'
 
       - name: Set up Android SDK
+        if: runner.os != 'macOS'
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
@@ -82,6 +84,7 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-
 
       - name: Install Android SDK dependencies
+        if: runner.os != 'macOS'
         run: >-
           dotnet build MauiDemos.slnx -t:InstallAndroidDependencies
           -f net11.0-android
@@ -96,8 +99,8 @@ jobs:
           dotnet build MauiDemos.slnx --configuration Debug
           -p:ContinuousIntegrationBuild=true
           -p:EnableCodeSigning=false
-          -p:AndroidSdkDirectory="$env:ANDROID_HOME"
-          -p:JavaSdkDirectory="$env:JAVA_HOME"
+          ${{ runner.os != 'macOS' && '-p:AndroidSdkDirectory="$env:ANDROID_HOME"' || '' }}
+          ${{ runner.os != 'macOS' && '-p:JavaSdkDirectory="$env:JAVA_HOME"' || '' }}
           ${{ runner.os == 'Windows' && '-maxcpucount:4' || '' }}
           "-bl:artifacts/build.binlog;ProjectImports=None"
           -clp:PerformanceSummary

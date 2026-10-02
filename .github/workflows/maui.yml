@@ -76,7 +76,7 @@ jobs:
         run: '"NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV'
 
       - name: Cache NuGet packages
-        if: github.event_name != 'workflow_dispatch' || inputs.use-caches
+        if: runner.os != 'Windows' && (github.event_name != 'workflow_dispatch' || inputs.use-caches)
         uses: actions/cache@v4
         with:
           path: ${{ env.NUGET_PACKAGES }}

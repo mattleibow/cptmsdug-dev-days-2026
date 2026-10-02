@@ -56,9 +56,11 @@ native Apple builds run on macOS. Debug builds include the demos' DevFlow
 integrations; no running emulator or signing secrets are needed.
 For prerelease versions, `setup-dotnet` installs the exact SDK from `global.json`;
 roll-forward applies when a newer compatible SDK is already installed.
-NuGet packages are cached separately per operating system, architecture, and SDK,
+Linux and macOS NuGet packages are cached per operating system, architecture, and SDK,
 with cache keys tracking the demo dependencies. Workload package downloads are
 kept out of the application package cache to avoid duplicating cached files.
+Windows restores application packages directly: restoring its multi-gigabyte
+NuGet cache took longer than downloading the packages in the measured CI runs.
 On Windows, the SDK and installed workloads are cached in an isolated .NET
 directory, including their installation records,
 rather than modifying or caching the runner's shared .NET installation.

@@ -30,10 +30,7 @@ The project canvas is available from the checkout, but the third-party Mobile De
 
 ## Get started
 
-The repository's `global.json` sets .NET 11 RC1 as the minimum SDK and selects
-the latest installed .NET 11.0 SDK, including later previews and feature bands.
-
-Install the .NET 11 SDK, the MAUI workload for your platform, and the
+Install the .NET 11 RC1 SDK or newer, the MAUI workload for your platform, and the
 [.NET MAUI extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.dotnet-maui).
 
 1. Open this repository in VS Code.
@@ -43,57 +40,3 @@ Install the .NET 11 SDK, the MAUI workload for your platform, and the
 
 Android needs the Android SDK and an emulator or connected device.
 iOS and Mac Catalyst need a Mac with Xcode installed.
-
-## Continuous integration
-
-The [MAUI workflow](.github/workflows/maui.yml) builds both demo projects through
-`MauiDemos.slnx` for pushes to `main` and pull requests targeting `main`, and can
-also be run manually.
-Its matrix contains only operating systems. Target framework conditions
-in each demo's project file select Android on Linux, Android/iOS/Mac Catalyst
-on macOS, and all four targets (including Windows) on Windows.
-
-The workflow installs the SDK specified in `global.json`, the solution's MAUI
-workloads, Java 21, and the required Android SDK components. macOS uses Xcode 26.6
-for the RC1 Apple workloads and uses the SDK's default iOS runtime identifier.
-Both demos target Mac Catalyst 17.0 or newer, as required by the .NET 11 workload.
-Apple targets on Windows provide compilation coverage, not runnable app bundles;
-native Apple builds run on macOS. Debug builds include the demos' DevFlow
-integrations; no running emulator or signing secrets are needed.
-For prerelease versions, `setup-dotnet` installs the exact SDK from `global.json`;
-roll-forward applies when a newer compatible SDK is already installed.
-Linux and macOS NuGet packages are cached per operating system, architecture, and SDK,
-with cache keys tracking the demo dependencies. Workload package downloads are
-kept out of the application package cache to avoid duplicating cached files.
-Windows restores application packages directly: restoring its multi-gigabyte
-NuGet cache took longer than downloading the packages in the measured CI runs.
-On Windows, the SDK and installed workloads are cached in an isolated .NET
-directory, including their installation records,
-rather than modifying or caching the runner's shared .NET installation.
-Linux and macOS install their workloads normally, avoiding multi-gigabyte caches
-for already short installation steps.
-Workload restore still runs to verify the solution's requirements.
-Manual runs can disable both caches using the `use-caches` input for comparisons.
-Windows builds use four MSBuild nodes to allow more targets to overlap;
-this increases scheduling concurrency, not the runner's CPU count.
-
-To build both demos for the current operating system:
-
-```powershell
-dotnet workload restore MauiDemos.slnx
-dotnet build MauiDemos.slnx --configuration Debug
-```
-
-Each CI job uploads its Android dependency and solution build binlogs as a
-`binlogs-<os>-attempt-<number>` artifact, including failed builds, with seven-day
-retention. Reruns retain separate logs for comparison.
-The build also prints MSBuild target and task timing summaries.
-Download an artifact and inspect it with the repository's pinned local tool:
-
-```powershell
-dotnet tool restore
-dotnet tool run binlogtool -- search <path-to-build.binlog> '$task'
-```
-
-Binlogs can contain build properties and environment values. Imported project
-files are excluded from these CI logs, but review logs before sharing them.

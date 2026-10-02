@@ -16,7 +16,8 @@
 - Use `dotnet run` to build, launch, and validate the chosen app. A build alone
   does not validate an interaction. Do not use `--no-build` after source changes.
 - Select the project and platform from the user's request and the execution
-  host. Do not attempt Apple targets on Windows or Windows targets on macOS.
+  host. For local runtime testing, do not attempt Apple targets on Windows or
+  Windows targets on macOS. CI's Windows Apple builds are compilation-only.
 - Restrict `TargetFrameworks` to the selected target so unrelated platform
   workloads are not required. Use Debug for live inspection.
 - For Android and iOS, discover available devices first and set `$device` to
@@ -88,6 +89,57 @@ dotnet run `
     --device $device `
     --no-launch-profile
 ```
+
+## CI and build troubleshooting
+
+- `.github/workflows/maui.yml` builds both demos through `MauiDemos.slnx`.
+  Automatic runs are limited to pushes to `main` and PRs targeting `main`;
+  manual dispatch is also available.
+- Keep the matrix OS-only. Each project selects Android on Linux,
+  Android/iOS/Mac Catalyst on macOS, and all four targets on Windows.
+  Windows Apple targets provide compilation coverage, not runnable bundles.
+- `global.json` sets .NET 11 RC1 as the minimum and rolls forward to the latest
+  installed .NET 11.0 SDK, including previews and feature bands. CI's
+  `setup-dotnet` installs the exact prerelease SDK specified there.
+- CI installs the solution's workloads, Java 21, and Android SDK components.
+  macOS selects Xcode 26.6 for RC1 and uses the default iOS runtime identifier;
+  there is no explicit simulator override. Mac Catalyst requires minimum 17.0.
+  Builds use Debug (including DevFlow), `ContinuousIntegrationBuild=true`, and
+  `EnableCodeSigning=false`; CI does not launch apps or emulators.
+- Cache the isolated .NET installation and workload records on Windows only;
+  do not cache or modify the runner's shared installation. Always run workload
+  restore to verify requirements, even on a cache hit.
+- Linux/macOS cache application NuGet packages per OS, architecture, SDK, and
+  dependency hash. Set their package path after workload installation to avoid
+  duplicating workload downloads. Windows downloads application packages
+  directly because its measured NuGet cache overhead exceeded restore savings.
+  Linux/macOS workload installations are too short to justify large SDK caches.
+- Use manual dispatch's `use-caches=false` for uncached comparisons. Compare
+  actual cache hits and restore/save overhead, not just total job duration.
+  PR caches are scoped to the PR merge ref; rerun the same PR job for warm-cache
+  comparisons instead of assuming branch dispatch can read them.
+- Windows uses `-maxcpucount:4`. This increases scheduling concurrency, not CPU
+  capacity; it does not guarantee a speedup or fixed batches of target frameworks.
+
+For solution-wide build checks, rather than app runtime validation:
+
+```powershell
+dotnet workload restore MauiDemos.slnx
+dotnet build MauiDemos.slnx --configuration Debug
+```
+
+CI prints MSBuild performance summaries and uploads dependency/build binlogs as
+`binlogs-<os>-attempt-<number>`, including failures, with seven-day retention.
+Inspect downloaded logs with the pinned local tool:
+
+```powershell
+dotnet tool restore
+dotnet tool run binlogtool -- search <path-to-build.binlog> '$task'
+```
+
+Task durations can overlap; cumulative timings are not wall-clock totals.
+`ProjectImports=None` excludes imported file contents, not imports themselves.
+Binlogs still contain properties and environment values; review before sharing.
 
 ## MAUI DevFlow and Inspector
 

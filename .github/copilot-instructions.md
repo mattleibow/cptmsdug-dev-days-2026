@@ -117,6 +117,8 @@ dotnet run `
 - Cache the isolated .NET installation and workload records on Windows only;
   do not cache or modify the runner's shared installation. Always run workload
   restore to verify requirements, even on a cache hit.
+  Only Windows overrides `DOTNET_INSTALL_DIR`; other hosts use setup-dotnet's
+  default location so an already installed matching SDK can be reused.
 - Linux/macOS cache application NuGet packages per OS, architecture, SDK, and
   dependency hash. Set their package path after workload installation to avoid
   duplicating workload downloads. Windows downloads application packages

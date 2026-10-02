@@ -55,7 +55,7 @@ jobs:
         if: runner.os != 'macOS'
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0
           log-accepted-android-sdk-licenses: false
 
       - name: Select Xcode
@@ -76,17 +76,6 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-
-
-      - name: Install Android SDK dependencies
-        if: runner.os != 'macOS'
-        run: >-
-          dotnet build MauiDemos.slnx -t:InstallAndroidDependencies
-          -f net11.0-android
-          -p:TargetFrameworks=net11.0-android
-          -p:AndroidSdkDirectory="$env:ANDROID_HOME"
-          -p:JavaSdkDirectory="$env:JAVA_HOME"
-          -p:AcceptAndroidSDKLicenses=True
-          "-bl:artifacts/android-dependencies.binlog;ProjectImports=None"
 
       - name: Build solution
         run: >-

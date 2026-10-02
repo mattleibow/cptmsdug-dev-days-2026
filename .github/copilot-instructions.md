@@ -104,8 +104,10 @@ dotnet run `
 - `global.json` sets .NET 11 RC1 as the minimum and rolls forward to the latest
   installed .NET 11.0 SDK, including previews and feature bands. CI's
   `setup-dotnet` installs the exact prerelease SDK specified there.
-- CI installs the solution's workloads. Only Linux/Windows set up Java 21,
-  Android SDK components, and Android dependency builds.
+- CI installs the solution's workloads. Only Linux/Windows set up Java 21
+  and Android SDK components. `setup-android` installs `platform-tools`,
+  `platforms;android-37.0`, and `build-tools;36.0.0` directly; there is no separate
+  MSBuild dependency installation. Recheck these versions when updating .NET.
   macOS selects Xcode 26.6 for RC1 and uses the default iOS runtime identifier;
   there is no explicit simulator override. Mac Catalyst requires minimum 17.0.
   Builds use Debug (including DevFlow), `ContinuousIntegrationBuild=true`, and
@@ -132,7 +134,7 @@ dotnet workload restore MauiDemos.slnx
 dotnet build MauiDemos.slnx --configuration Debug
 ```
 
-CI prints MSBuild performance summaries and uploads dependency/build binlogs as
+CI prints MSBuild performance summaries and uploads solution build binlogs as
 `binlogs-<os>-attempt-<number>`, including failures, with seven-day retention.
 Inspect downloaded logs with the pinned local tool:
 

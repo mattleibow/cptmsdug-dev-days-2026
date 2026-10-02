@@ -1,8 +1,10 @@
-﻿namespace MauiXamlDemo;
+﻿using CounterCore;
+
+namespace MauiXamlDemo;
 
 public partial class MainPage : ContentPage
 {
-	int count = 0;
+	readonly CounterService counter = new();
 
 	public MainPage()
 	{
@@ -11,7 +13,7 @@ public partial class MainPage : ContentPage
 
 	private void OnCounterClicked(object? sender, EventArgs e)
 	{
-		count++;
+		var count = counter.Increment();
 
 		if (count == 1)
 			CounterBtn.Text = $"Clicked {count} time";

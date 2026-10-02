@@ -30,6 +30,16 @@ dotnet build demos\MauiBlazorDemo\MauiBlazorDemo.csproj -f net11.0-windows10.0.1
 
 Build only the project you choose. For Android, iOS, or Mac Catalyst, use the corresponding target framework and workload.
 
+## Continuous integration
+
+The [MAUI Android workflow](.github/workflows/maui-android.yml) builds both demo
+projects independently on Linux for every push and pull request, and can also be
+run manually. It installs the .NET 11 preview SDK, MAUI Android workload, Java 21,
+and the required Android SDK components. Builds use the Debug configuration to
+include the demos' DevFlow integrations; no emulator or signing secrets are needed.
+
+## Windows tooling
+
 Both MAUI projects reference `Microsoft.Windows.SDK.BuildTools.WinApp` only for
 the Windows target, with build tooling kept private to each app. Run either app
 with `dotnet run --project <project-path> --framework net11.0-windows10.0.19041.0

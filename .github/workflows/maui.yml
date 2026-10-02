@@ -8,6 +8,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      use-caches:
+        description: Restore and save SDK/workload and NuGet caches
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -32,15 +37,25 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Set isolated .NET and NuGet paths
+        run: |
+          "DOTNET_INSTALL_DIR=$(Join-Path $env:RUNNER_TEMP dotnet)" >> $env:GITHUB_ENV
+          "NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV
+
+      - name: Cache .NET SDK and workloads
+        if: github.event_name != 'workflow_dispatch' || inputs.use-caches
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.DOTNET_INSTALL_DIR }}
+          key: ${{ runner.os }}-${{ runner.arch }}-dotnet-v1-${{ hashFiles('global.json', 'demos/**/*.csproj', 'demos/Directory.Build.props') }}
+
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
-      - name: Set NuGet cache path
-        run: '"NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV'
-
       - name: Cache NuGet packages
+        if: github.event_name != 'workflow_dispatch' || inputs.use-caches
         uses: actions/cache@v4
         with:
           path: ${{ env.NUGET_PACKAGES }}

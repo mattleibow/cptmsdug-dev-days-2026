@@ -7,7 +7,7 @@
   Work only on the project the user chooses.
 - Implement only the behavior requested by the user. Do not infer extra
   requirements from unrelated documentation.
-- Keep the README for humans: project choices, demo links, and simple run
+- Keep the README for humans: project choices, demo links, and simple VS Code
   instructions. Keep agent tooling and troubleshooting guidance here.
 - Use Windows-style filesystem paths when running on Windows.
 
@@ -15,20 +15,81 @@
 
 - Use `dotnet run` to build, launch, and validate the chosen app. A build alone
   does not validate an interaction. Do not use `--no-build` after source changes.
-- On Windows, restrict `TargetFrameworks` to the Windows target so other
-  platform workloads are not required for this run:
-
-  ```powershell
-  dotnet run --project demos\MauiXamlDemo\MauiXamlDemo.csproj --framework net11.0-windows10.0.19041.0 --property:TargetFrameworks=net11.0-windows10.0.19041.0 --no-launch-profile
-  ```
-
-- Substitute the Blazor project path when that is the chosen app.
-- Discover devices before Android deployment. Target the selected device and
-  its architecture; avoid building unrelated architectures for an emulator.
+- Select the project and platform from the user's request and the execution
+  host. Do not attempt Apple targets on Windows or Windows targets on macOS.
+- Restrict `TargetFrameworks` to the selected target so unrelated platform
+  workloads are not required. Use Debug for live inspection.
+- For Android and iOS, discover available devices first and set `$device` to
+  the selected native serial or UDID. Pass it with `--device` instead of leaving
+  an unattended command waiting at .NET 11's interactive device picker.
+- Target the selected device's architecture when generating a standalone APK.
+  Avoid building unrelated architectures for an emulator.
 - Verify the app is responsive and check the actual behavior requested by the
   user. For UI changes, inspect the live tree, properties, and screenshots.
 - If asked to leave the app running, use a persistent terminal or detached
   process. When restarting, stop only the specific app process.
+- After a source change, restart with a fresh `dotnet run` and rediscover the
+  agent before inspecting. Do not validate an old process or installed binary.
+- Report launch or runtime failures explicitly. Inspect relevant logs before
+  changing dependencies, project settings, or device data.
+
+### Platform commands
+
+Run from the repository root in PowerShell (`pwsh`). These examples use the
+XAML project; substitute `MauiBlazorDemo` and `MauiBlazorDemo.csproj` when the
+user chooses Blazor. `Join-Path` keeps project paths portable between hosts.
+
+#### Windows
+
+```powershell
+dotnet run `
+    --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --framework net11.0-windows10.0.19041.0 `
+    --property:TargetFrameworks=net11.0-windows10.0.19041.0 `
+    --no-launch-profile
+```
+
+#### macOS (Mac Catalyst)
+
+Run on a Mac with Xcode installed.
+
+```powershell
+dotnet run `
+    --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --framework net11.0-maccatalyst `
+    --property:TargetFrameworks=net11.0-maccatalyst `
+    --no-launch-profile
+```
+
+#### Android
+
+Start the selected emulator or connect the device first. Set `$device` to its
+discovered serial, such as `emulator-5554`, before running. The minimum API
+override satisfies the .NET 11 SDK without editing the template project.
+
+```powershell
+dotnet run `
+    --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --framework net11.0-android `
+    --property:TargetFrameworks=net11.0-android `
+    --property:SupportedOSPlatformVersion=24.0 `
+    --device $device `
+    --no-launch-profile
+```
+
+#### iOS
+
+Run on a Mac with Xcode installed. Set `$device` to the selected simulator's
+UDID before running; physical devices additionally require provisioning.
+
+```powershell
+dotnet run `
+    --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --framework net11.0-ios `
+    --property:TargetFrameworks=net11.0-ios `
+    --device $device `
+    --no-launch-profile
+```
 
 ## MAUI DevFlow and Inspector
 
@@ -76,9 +137,9 @@
   process lifetimes, and Inspector connections are independent.
 - Distinguish a warm return from a cold restart: bringing an app to the
   foreground should not force-stop it unless the user asks for a restart.
-- The installed .NET 11 Android SDK may require a minimum API of 24. If the
-  template's `SupportedOSPlatformVersion` is rejected, use the SDK diagnostic
-  to update the selected project's Android minimum during implementation.
+- The installed .NET 11 Android SDK may require a minimum API of 24. Prefer
+  the command-line override above for local validation; change the project's
+  Android minimum only when that is part of the requested implementation.
 - Prefer `dotnet run` for build-and-run testing. If directly installing a
   generated APK instead, build with `EmbedAssembliesIntoApk=true`; a standalone
   APK must not depend on fast-deployed managed assemblies.

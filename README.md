@@ -24,14 +24,13 @@ The project canvas is available from the checkout, but the third-party Mobile De
 
 ## Get started
 
-Install the .NET 11 SDK and the .NET MAUI workload for your platform.
-On Windows, run the XAML app from the repository root:
+Install the .NET 11 SDK, the MAUI workload for your platform, and the
+[.NET MAUI extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.dotnet-maui).
 
-```powershell
-dotnet run --project demos\MauiXamlDemo\MauiXamlDemo.csproj --framework net11.0-windows10.0.19041.0 --property:TargetFrameworks=net11.0-windows10.0.19041.0 --no-launch-profile
-```
+1. Open this repository in VS Code.
+2. Choose the XAML or Blazor project and select your debug target or device.
+3. Press **F5** to build and run. If prompted, choose **C#** and the project's
+   launch configuration.
 
-Use `demos\MauiBlazorDemo\MauiBlazorDemo.csproj` instead for the Blazor app.
-`dotnet run` builds and launches the app; no separate build step is needed.
-For Android, iOS, or Mac Catalyst, use the corresponding target framework,
-workload, and device or simulator.
+Android needs the Android SDK and an emulator or connected device.
+iOS and Mac Catalyst need a Mac with Xcode installed.

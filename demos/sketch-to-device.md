@@ -22,7 +22,7 @@ I need to make some changes to my XAML app.
 which screen or behavior to change. Answer its question with:
 
 ```text
-Can I sketch it instead? Open the Sketch to app canvas.
+Can I sketch it instead?
 ```
 
 **What changes:** A shared drawing board opens beside chat. No app code needs
@@ -40,15 +40,13 @@ In **Notes for Copilot**, write:
 ```text
 The submarine is the .NET 10 bot.
 The rocket is the .NET 11 bot.
-Tap the bot image to play the transition, not on startup.
-Tap it again to replay.
+Tap the bot image to play the transition.
 ```
 
 Then paste:
 
 ```text
-Read my sketch and notes. Describe the transition you think
-I mean, and ask me to confirm the movement before editing the app.
+Please build this.
 ```
 
 **What to show:** Copilot reads the saved drawing and notes, not just the

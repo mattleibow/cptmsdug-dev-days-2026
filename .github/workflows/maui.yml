@@ -82,8 +82,6 @@ jobs:
           dotnet build MauiDemos.slnx --configuration Debug
           -p:ContinuousIntegrationBuild=true
           -p:EnableCodeSigning=false
-          ${{ runner.os != 'macOS' && '-p:AndroidSdkDirectory="$env:ANDROID_HOME"' || '' }}
-          ${{ runner.os != 'macOS' && '-p:JavaSdkDirectory="$env:JAVA_HOME"' || '' }}
           ${{ runner.os == 'Windows' && '-maxcpucount:4' || '' }}
           "-bl:artifacts/build.binlog;ProjectImports=None"
           -clp:PerformanceSummary

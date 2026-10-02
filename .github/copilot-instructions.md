@@ -108,6 +108,8 @@ dotnet run `
   and Android SDK components. `setup-android` installs `platform-tools`,
   `platforms;android-37.0`, and `build-tools;36.0.0` directly; there is no separate
   MSBuild dependency installation. Recheck these versions when updating .NET.
+  Builds discover Android and Java through the setup actions' `ANDROID_HOME`
+  and `JAVA_HOME`; do not duplicate these as command-line SDK directory properties.
   macOS selects Xcode 26.6 for RC1 and uses the default iOS runtime identifier;
   there is no explicit simulator override. Mac Catalyst requires minimum 17.0.
   Builds use Debug (including DevFlow), `ContinuousIntegrationBuild=true`, and

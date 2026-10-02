@@ -30,7 +30,7 @@ The project canvas is available from the checkout, but the third-party Mobile De
 
 ## Get started
 
-Install the .NET 11 SDK, the MAUI workload for your platform, and the
+Install the .NET 11 RC1 SDK or newer, the MAUI workload for your platform, and the
 [.NET MAUI extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.dotnet-maui).
 
 1. Open this repository in VS Code.

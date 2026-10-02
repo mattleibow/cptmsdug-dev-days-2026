@@ -16,7 +16,8 @@
 - Use `dotnet run` to build, launch, and validate the chosen app. A build alone
   does not validate an interaction. Do not use `--no-build` after source changes.
 - Select the project and platform from the user's request and the execution
-  host. Do not attempt Apple targets on Windows or Windows targets on macOS.
+  host. For local runtime testing, do not attempt Apple targets on Windows or
+  Windows targets on macOS.
 - Restrict `TargetFrameworks` to the selected target so unrelated platform
   workloads are not required. Use Debug for live inspection.
 - For Android and iOS, discover available devices first and set `$device` to
@@ -88,6 +89,23 @@ dotnet run `
     --device $device `
     --no-launch-profile
 ```
+
+## CI and build troubleshooting
+
+- Read `.github/workflows/maui.yml`, `global.json`, and the project files for
+  current configuration. Do not duplicate their versions, flags, or matrix here.
+- The host- and CI-specific target split is intentional for the platform-drift demo,
+  not a limitation of the toolchain. A local build does not validate other hosts.
+  Fix platform implementations rather than removing failing targets.
+- When changing SDK versions, check the required Android packages and Xcode
+  compatibility together.
+- Measure cache download, extraction, and upload overhead before calling it an
+  optimization. Compare runs with compatible cache scopes and account for runner
+  variability. Cache task-owned installations, not shared runner directories.
+- Use CI binlogs and the local `binlogtool` for slow-build investigations.
+  Task durations can overlap; cumulative timings are not wall-clock totals.
+  Binlogs may contain properties and environment values even without embedded
+  imports; review them before sharing.
 
 ## MAUI DevFlow and Inspector
 

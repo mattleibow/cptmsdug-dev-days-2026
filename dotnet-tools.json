@@ -8,6 +8,13 @@
         "maui"
       ],
       "rollForward": false
+    },
+    "binlogtool": {
+      "version": "1.0.33",
+      "commands": [
+        "binlogtool"
+      ],
+      "rollForward": false
     }
   }
 }

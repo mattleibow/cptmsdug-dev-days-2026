@@ -118,8 +118,8 @@ dotnet run `
   duplicating workload downloads. Windows downloads application packages
   directly because its measured NuGet cache overhead exceeded restore savings.
   Linux/macOS workload installations are too short to justify large SDK caches.
-- Use manual dispatch's `use-caches=false` for uncached comparisons. Compare
-  actual cache hits and restore/save overhead, not just total job duration.
+- Caching is enabled for automatic and manual runs. Compare actual cache hits
+  and restore/save overhead, not just total job duration.
   PR caches are scoped to the PR merge ref; rerun the same PR job for warm-cache
   comparisons instead of assuming branch dispatch can read them.
 - Windows uses `-maxcpucount:4`. This increases scheduling concurrency, not CPU

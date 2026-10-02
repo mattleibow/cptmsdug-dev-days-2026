@@ -44,18 +44,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Set isolated .NET path
-        if: runner.os == 'Windows'
-        run: |
-          "DOTNET_INSTALL_DIR=$(Join-Path $env:RUNNER_TEMP dotnet)" >> $env:GITHUB_ENV
-
-      - name: Cache .NET SDK and workloads
-        if: runner.os == 'Windows'
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.DOTNET_INSTALL_DIR }}
-          key: ${{ runner.os }}-${{ runner.arch }}-dotnet-v1-${{ hashFiles('global.json', 'demos/**/*.csproj') }}
-
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
@@ -97,9 +85,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-nuget-v2-${{ hashFiles('global.json') }}-
 
+      - name: Restore solution
+        run: >-
+          dotnet restore MauiDemos.slnx
+          -p:Configuration=Debug
+          -p:TargetFramework=${{ matrix.framework }}
+          -p:TargetFrameworks=${{ matrix.framework }}
+          -p:ContinuousIntegrationBuild=true
+          -p:EnableCodeSigning=false
+          "-bl:artifacts/restore.binlog;ProjectImports=None"
+
       - name: Build solution
         run: >-
-          dotnet build MauiDemos.slnx --configuration Debug
+          dotnet build MauiDemos.slnx --configuration Debug --no-restore
           -p:TargetFramework=${{ matrix.framework }}
           -p:TargetFrameworks=${{ matrix.framework }}
           -p:ContinuousIntegrationBuild=true

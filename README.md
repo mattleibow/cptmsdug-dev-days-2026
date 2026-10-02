@@ -21,6 +21,9 @@ The project canvas is available from the checkout, but the third-party Mobile De
 
 ## Get started
 
+The repository's `global.json` sets .NET 11 RC1 as the minimum SDK and selects
+the latest installed .NET 11.0 SDK, including later previews and feature bands.
+
 Install the .NET 11 SDK and the .NET MAUI workload for your platform. On Windows, from the repository root:
 
 ```powershell
@@ -34,9 +37,11 @@ Build only the project you choose. For Android, iOS, or Mac Catalyst, use the co
 
 The [MAUI Android workflow](.github/workflows/maui-android.yml) builds both demo
 projects independently on Linux for every push and pull request, and can also be
-run manually. It installs the .NET 11 preview SDK, MAUI Android workload, Java 21,
+run manually. It installs the SDK specified in `global.json`, MAUI Android workload, Java 21,
 and the required Android SDK components. Builds use the Debug configuration to
 include the demos' DevFlow integrations; no emulator or signing secrets are needed.
+For prerelease versions, `setup-dotnet` installs the exact SDK from `global.json`;
+roll-forward applies when a newer compatible SDK is already installed.
 
 ## Windows tooling
 

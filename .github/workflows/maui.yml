@@ -37,13 +37,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Set isolated .NET and NuGet paths
+      - name: Set isolated .NET path
         run: |
           "DOTNET_INSTALL_DIR=$(Join-Path $env:RUNNER_TEMP dotnet)" >> $env:GITHUB_ENV
-          "NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV
 
       - name: Cache .NET SDK and workloads
-        if: github.event_name != 'workflow_dispatch' || inputs.use-caches
+        if: runner.os == 'Windows' && (github.event_name != 'workflow_dispatch' || inputs.use-caches)
         uses: actions/cache@v4
         with:
           path: ${{ env.DOTNET_INSTALL_DIR }}
@@ -53,15 +52,6 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
-
-      - name: Cache NuGet packages
-        if: github.event_name != 'workflow_dispatch' || inputs.use-caches
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.NUGET_PACKAGES }}
-          key: ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj', 'demos/Directory.Build.props') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('global.json') }}-
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -81,6 +71,18 @@ jobs:
 
       - name: Install MAUI workloads
         run: dotnet workload restore MauiDemos.slnx --skip-manifest-update
+
+      - name: Set NuGet cache path
+        run: '"NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV'
+
+      - name: Cache NuGet packages
+        if: github.event_name != 'workflow_dispatch' || inputs.use-caches
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj', 'demos/Directory.Build.props') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-
 
       - name: Install Android SDK dependencies
         run: >-

@@ -57,9 +57,13 @@ integrations; no running emulator or signing secrets are needed.
 For prerelease versions, `setup-dotnet` installs the exact SDK from `global.json`;
 roll-forward applies when a newer compatible SDK is already installed.
 NuGet packages are cached separately per operating system, architecture, and SDK,
-with cache keys tracking the demo dependencies. The SDK and installed workloads
-are cached in an isolated .NET directory, including their installation records,
+with cache keys tracking the demo dependencies. Workload package downloads are
+kept out of the application package cache to avoid duplicating cached files.
+On Windows, the SDK and installed workloads are cached in an isolated .NET
+directory, including their installation records,
 rather than modifying or caching the runner's shared .NET installation.
+Linux and macOS install their workloads normally, avoiding multi-gigabyte caches
+for already short installation steps.
 Workload restore still runs to verify the solution's requirements.
 Manual runs can disable both caches using the `use-caches` input for comparisons.
 Windows builds use four MSBuild nodes to allow more targets to overlap;

@@ -14,6 +14,9 @@ Choose **one** as the app you're building; they are alternative starting points,
 - **[Build your first canvas](demos/first-canvas.md)** is a 5–10-minute
   walkthrough: create a cue card, count breaths from chat, then ask chat
   to read the total back.
+- **[Sketch to device](demos/sketch-to-device.md)** is a copy-and-paste demo:
+  use a shared sketch, inspect the running app, and interact with an Android
+  device.
 - **[Sketch to app](.github/extensions/sketch-to-app/README.md)** is included in this repository. Draw on the whiteboard and use chat to load or save images, edit notes, and build the app you chose above from the saved sketch. Its Blazor source, controls, and implementation walkthrough live with the extension. Only the large prebuilt UI lives separately in [`prebuilt/sketch-to-app`](prebuilt/sketch-to-app), outside the extension's 8 MiB size budget.
 - **[Mobile Device](https://github.com/Redth/mobile-canvas-ghcp)** is a separate `mobile-canvas` plugin for previewing and interacting with an Android emulator or iOS Simulator after building the app. To use it in the GitHub Copilot app, open **Customize → Plugins**, add the `Redth/mobile-canvas-ghcp` marketplace, install **mobile-canvas**, and reload Copilot. Android requires an Android SDK; iOS requires macOS and Xcode.
 
@@ -24,14 +27,16 @@ The project canvas is available from the checkout, but the third-party Mobile De
 The repository's `global.json` sets .NET 11 RC1 as the minimum SDK and selects
 the latest installed .NET 11.0 SDK, including later previews and feature bands.
 
-Install the .NET 11 SDK and the .NET MAUI workload for your platform. On Windows, from the repository root:
+Install the .NET 11 SDK, the MAUI workload for your platform, and the
+[.NET MAUI extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.dotnet-maui).
 
-```powershell
-dotnet build demos\MauiXamlDemo\MauiXamlDemo.csproj -f net11.0-windows10.0.19041.0 -p:TargetFrameworks=net11.0-windows10.0.19041.0
-dotnet build demos\MauiBlazorDemo\MauiBlazorDemo.csproj -f net11.0-windows10.0.19041.0 -p:TargetFrameworks=net11.0-windows10.0.19041.0
-```
+1. Open this repository in VS Code.
+2. Choose the XAML or Blazor project and select your debug target or device.
+3. Press **F5** to build and run. If prompted, choose **C#** and the project's
+   launch configuration.
 
-Build only the project you choose. For Android, iOS, or Mac Catalyst, use the corresponding target framework and workload.
+Android needs the Android SDK and an emulator or connected device.
+iOS and Mac Catalyst need a Mac with Xcode installed.
 
 ## Continuous integration
 
@@ -58,36 +63,3 @@ To build both demos for the current operating system:
 dotnet workload restore MauiDemos.slnx
 dotnet build MauiDemos.slnx --configuration Debug
 ```
-
-## Windows tooling
-
-Both MAUI projects reference `Microsoft.Windows.SDK.BuildTools.WinApp` only for
-the Windows target, with build tooling kept private to each app. Run either app
-with `dotnet run --project <project-path> --framework net11.0-windows10.0.19041.0
---property:TargetFrameworks=net11.0-windows10.0.19041.0 --no-launch-profile`.
-
-## MAUI DevFlow
-
-Both MAUI apps include the experimental `Microsoft.Maui.DevFlow.Agent` package
-and registration in Debug builds only. The Blazor app also includes
-`Microsoft.Maui.DevFlow.Blazor` for WebView inspection.
-Release builds do not include the agent or Blazor bridge.
-Windows Debug builds apply the temporary workaround from
-[dotnet/maui-labs#66](https://github.com/dotnet/maui-labs/issues/66), copying
-the Blazor bridge's `chobitsu.js` within the restored package's shared NuGet cache
-to satisfy its incorrect PRI asset paths.
-The matching `Microsoft.Maui.Cli` is pinned in the repository's local tool manifest;
-no global tool installation is needed.
-
-From the repository root:
-
-```powershell
-dotnet tool restore
-dotnet tool run maui -- devflow broker start
-dotnet run --project demos\MauiXamlDemo\MauiXamlDemo.csproj --framework net11.0-windows10.0.19041.0 --property:TargetFrameworks=net11.0-windows10.0.19041.0 --no-launch-profile
-```
-
-Use `demos\MauiBlazorDemo\MauiBlazorDemo.csproj` instead to run the Blazor app.
-In another terminal, use `dotnet tool run maui -- devflow list` to discover the
-running app, or `dotnet tool run maui -- devflow ui tree` to inspect it.
-Open `http://localhost:19223/inspector/` for the DevFlow Inspector.

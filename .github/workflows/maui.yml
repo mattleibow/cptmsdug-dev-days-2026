@@ -73,9 +73,6 @@ jobs:
       - name: Install MAUI workloads
         run: dotnet workload install ${{ matrix.workload }} --skip-manifest-update
 
-      - name: Set NuGet cache path
-        run: '"NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV'
-
       - name: Restore solution
         run: >-
           dotnet restore MauiDemos.slnx

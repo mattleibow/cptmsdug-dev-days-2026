@@ -94,7 +94,9 @@ dotnet run `
 
 - `.github/workflows/maui.yml` builds both demos through `MauiDemos.slnx`.
   Automatic runs are limited to pushes to `main` and PRs targeting `main`;
-  manual dispatch is also available.
+  PRs build only on macOS for faster feedback. Pushes to `main` and manual
+  dispatch build on Linux, macOS, and Windows. Windows coverage is post-merge,
+  not a PR gate.
 - Keep the matrix OS-only. Each project selects Android on Linux,
   Android/iOS/Mac Catalyst on macOS, and all four targets on Windows.
   Windows Apple targets provide compilation coverage, not runnable bundles.

@@ -25,10 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-26
-          - windows-latest
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["macos-26"]' || '["ubuntu-latest", "macos-26", "windows-latest"]') }}
     defaults:
       run:
         shell: pwsh

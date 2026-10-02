@@ -81,6 +81,10 @@
         <PackageReference Include="Microsoft.Maui.DevFlow.Blazor" Version="0.1.0-preview.12.26421.1" GeneratePathProperty="true" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\CounterCore\CounterCore.csproj" />
+    </ItemGroup>
+
     <!-- Temporary workaround for https://github.com/dotnet/maui-labs/issues/66. -->
     <Target Name="_FixDevFlowBlazorWwwroot"
             BeforeTargets="AssignTargetPaths;_CopySourceItemsToOutputDirectory"

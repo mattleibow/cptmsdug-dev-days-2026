@@ -44,6 +44,7 @@ on macOS, and all four targets (including Windows) on Windows.
 The workflow installs the SDK specified in `global.json`, the solution's MAUI
 workloads, Java 21, and the required Android SDK components. macOS uses Xcode 26.6
 for the RC1 Apple workloads and builds iOS for the host's simulator architecture.
+Both demos target Mac Catalyst 17.0 or newer, as required by the .NET 11 workload.
 Apple targets on Windows provide compilation coverage, not runnable app bundles;
 native Apple builds run on macOS. Debug builds include the demos' DevFlow
 integrations; no running emulator or signing secrets are needed.

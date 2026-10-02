@@ -14,12 +14,27 @@ permissions:
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    env:
+      ContinuousIntegrationBuild: 'true'
+      CiTargetFramework: ${{ matrix.framework }}
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["macos-26"]' || '["ubuntu-latest", "macos-26", "windows-latest"]') }}
+        include:
+          - platform: android
+            os: ubuntu-latest
+            framework: net11.0-android
+          - platform: ios
+            os: macos-26
+            framework: net11.0-ios
+          - platform: maccatalyst
+            os: macos-26
+            framework: net11.0-maccatalyst
+          - platform: windows
+            os: windows-latest
+            framework: net11.0-windows10.0.19041.0
     defaults:
       run:
         shell: pwsh
@@ -46,14 +61,14 @@ jobs:
           global-json-file: global.json
 
       - name: Set up Java
-        if: runner.os != 'macOS'
+        if: runner.os == 'Linux'
         uses: actions/setup-java@v5
         with:
           distribution: microsoft
           java-version: '21'
 
       - name: Set up Android SDK
-        if: runner.os != 'macOS'
+        if: runner.os == 'Linux'
         uses: android-actions/setup-android@v3
         with:
           packages: >-
@@ -77,14 +92,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.NUGET_PACKAGES }}
-          key: ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-nuget-v2-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj') }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-
+            ${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-nuget-v2-${{ hashFiles('global.json') }}-
 
       - name: Build solution
         run: >-
           dotnet build MauiDemos.slnx --configuration Debug
-          -p:ContinuousIntegrationBuild=true
           -p:EnableCodeSigning=false
           ${{ runner.os == 'Windows' && '-maxcpucount:4' || '' }}
           "-bl:artifacts/build.binlog;ProjectImports=None"
@@ -94,7 +108,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: binlogs-${{ matrix.os }}-attempt-${{ github.run_attempt }}
+          name: binlogs-${{ matrix.platform }}-attempt-${{ github.run_attempt }}
           path: artifacts/*.binlog
           if-no-files-found: warn
           retention-days: 7

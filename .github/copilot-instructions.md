@@ -94,7 +94,7 @@ dotnet run `
 
 - Read `.github/workflows/maui.yml`, `global.json`, and the project files for
   current configuration. Do not duplicate their versions, flags, or matrix here.
-- The host-specific target split is intentional for the platform-drift demo,
+- The host- and CI-specific target split is intentional for the platform-drift demo,
   not a limitation of the toolchain. A local build does not validate other hosts.
   Fix platform implementations rather than removing failing targets.
 - When changing SDK versions, check the required Android packages and Xcode

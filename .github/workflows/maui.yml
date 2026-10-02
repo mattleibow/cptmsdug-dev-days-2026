@@ -37,6 +37,17 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Set NuGet cache path
+        run: '"NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj', 'demos/Directory.Build.props') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('global.json') }}-
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
@@ -73,6 +84,7 @@ jobs:
           -p:EnableCodeSigning=false
           -p:AndroidSdkDirectory="$env:ANDROID_HOME"
           -p:JavaSdkDirectory="$env:JAVA_HOME"
+          ${{ runner.os == 'Windows' && '-maxcpucount:4' || '' }}
           "-bl:artifacts/build.binlog;ProjectImports=None"
           -clp:PerformanceSummary
 
@@ -80,7 +92,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: binlogs-${{ matrix.os }}
+          name: binlogs-${{ matrix.os }}-attempt-${{ github.run_attempt }}
           path: artifacts/*.binlog
           if-no-files-found: warn
           retention-days: 7

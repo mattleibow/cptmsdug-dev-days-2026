@@ -56,6 +56,10 @@ native Apple builds run on macOS. Debug builds include the demos' DevFlow
 integrations; no running emulator or signing secrets are needed.
 For prerelease versions, `setup-dotnet` installs the exact SDK from `global.json`;
 roll-forward applies when a newer compatible SDK is already installed.
+NuGet packages are cached separately per operating system, architecture, and SDK,
+with cache keys tracking the demo dependencies. Workload installations are not
+cached. Windows builds use four MSBuild nodes to allow more targets to overlap;
+this increases scheduling concurrency, not the runner's CPU count.
 
 To build both demos for the current operating system:
 
@@ -65,7 +69,8 @@ dotnet build MauiDemos.slnx --configuration Debug
 ```
 
 Each CI job uploads its Android dependency and solution build binlogs as a
-`binlogs-<os>` artifact, including failed builds, with seven-day retention.
+`binlogs-<os>-attempt-<number>` artifact, including failed builds, with seven-day
+retention. Reruns retain separate logs for comparison.
 The build also prints MSBuild target and task timing summaries.
 Download an artifact and inspect it with the repository's pinned local tool:
 

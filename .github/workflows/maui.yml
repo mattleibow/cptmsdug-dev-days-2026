@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.DOTNET_INSTALL_DIR }}
-          key: ${{ runner.os }}-${{ runner.arch }}-dotnet-v1-${{ hashFiles('global.json', 'demos/**/*.csproj', 'demos/Directory.Build.props') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-dotnet-v1-${{ hashFiles('global.json', 'demos/**/*.csproj') }}
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
@@ -80,7 +80,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.NUGET_PACKAGES }}
-          key: ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj', 'demos/Directory.Build.props') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-${{ hashFiles('dotnet-tools.json', 'demos/**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-nuget-v2-${{ hashFiles('global.json') }}-
 

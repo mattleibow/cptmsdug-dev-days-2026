@@ -43,13 +43,13 @@ iOS and Mac Catalyst need a Mac with Xcode installed.
 The [MAUI workflow](.github/workflows/maui.yml) builds both demo projects through
 `MauiDemos.slnx` for pushes to `main` and pull requests targeting `main`, and can
 also be run manually.
-Its matrix contains only operating systems. Shared target framework conditions
-in `demos/Directory.Build.props` select Android on Linux, Android/iOS/Mac Catalyst
+Its matrix contains only operating systems. Target framework conditions
+in each demo's project file select Android on Linux, Android/iOS/Mac Catalyst
 on macOS, and all four targets (including Windows) on Windows.
 
 The workflow installs the SDK specified in `global.json`, the solution's MAUI
 workloads, Java 21, and the required Android SDK components. macOS uses Xcode 26.6
-for the RC1 Apple workloads and builds iOS for the host's simulator architecture.
+for the RC1 Apple workloads and uses the SDK's default iOS runtime identifier.
 Both demos target Mac Catalyst 17.0 or newer, as required by the .NET 11 workload.
 Apple targets on Windows provide compilation coverage, not runnable app bundles;
 native Apple builds run on macOS. Debug builds include the demos' DevFlow

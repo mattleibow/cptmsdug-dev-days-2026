@@ -81,17 +81,23 @@ jobs:
           -p:TargetFrameworks=${{ matrix.framework }}
           -p:ContinuousIntegrationBuild=true
           -p:EnableCodeSigning=false
-          "-bl:artifacts/restore.binlog;ProjectImports=None"
+          "-bl:artifacts/restore.binlog"
+
+      - name: Restore shared library
+        run: >-
+          dotnet restore demos/CounterCore/CounterCore.csproj
+          -p:Configuration=Debug
 
       - name: Build solution
         run: >-
-          dotnet build MauiDemos.slnx --configuration Debug --no-restore
-          -p:TargetFramework=${{ matrix.framework }}
+          dotnet build MauiDemos.slnx
+          --configuration Debug
+          --no-restore
           -p:TargetFrameworks=${{ matrix.framework }}
           -p:ContinuousIntegrationBuild=true
           -p:EnableCodeSigning=false
           ${{ runner.os == 'Windows' && '-maxcpucount:4' || '' }}
-          "-bl:artifacts/build.binlog;ProjectImports=None"
+          "-bl:artifacts/build.binlog"
           -clp:PerformanceSummary
 
       - name: Upload build binlogs

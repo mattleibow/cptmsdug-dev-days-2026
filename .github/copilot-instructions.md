@@ -92,64 +92,20 @@ dotnet run `
 
 ## CI and build troubleshooting
 
-- `.github/workflows/maui.yml` builds both demos through `MauiDemos.slnx`.
-  Automatic runs are limited to pushes to `main` and PRs targeting `main`;
-  PRs build only on macOS for faster feedback. Pushes to `main` and manual
-  dispatch build on Linux, macOS, and Windows. Android and Windows coverage is
-  post-merge, not a PR gate.
-- Keep the matrix OS-only. Each project selects Android on Linux,
-  Android/Windows on Windows, and iOS/Mac Catalyst on macOS. This is an intentional
-  demo split, not a statement of host capabilities. Local Windows builds do not
-  validate Apple implementations; macOS PR CI catches platform contract drift.
-- `global.json` sets .NET 11 RC1 as the minimum and rolls forward to the latest
-  installed .NET 11.0 SDK, including previews and feature bands. CI's
-  `setup-dotnet` installs the exact prerelease SDK specified there.
-- CI installs the solution's workloads. Only Linux/Windows set up Java 21
-  and Android SDK components. `setup-android` installs `platform-tools`,
-  `platforms;android-37.0`, and `build-tools;36.0.0` directly; there is no separate
-  MSBuild dependency installation. Recheck these versions when updating .NET.
-  Builds discover Android and Java through the setup actions' `ANDROID_HOME`
-  and `JAVA_HOME`; do not duplicate these as command-line SDK directory properties.
-  macOS selects Xcode 26.6 for RC1 and uses the default iOS runtime identifier;
-  there is no explicit simulator override. Mac Catalyst requires minimum 17.0.
-  Builds use Debug (including DevFlow), `ContinuousIntegrationBuild=true`, and
-  `EnableCodeSigning=false`; CI does not launch apps or emulators.
-- Cache the isolated .NET installation and workload records on Windows only;
-  do not cache or modify the runner's shared installation. Always run workload
-  restore to verify requirements, even on a cache hit.
-  Only Windows overrides `DOTNET_INSTALL_DIR`; other hosts use setup-dotnet's
-  default location so an already installed matching SDK can be reused.
-- Linux/macOS cache application NuGet packages per OS, architecture, SDK, and
-  dependency hash. Set their package path after workload installation to avoid
-  duplicating workload downloads. Windows downloads application packages
-  directly because its measured NuGet cache overhead exceeded restore savings.
-  Linux/macOS workload installations are too short to justify large SDK caches.
-- Caching is enabled for automatic and manual runs. Compare actual cache hits
-  and restore/save overhead, not just total job duration.
-  PR caches are scoped to the PR merge ref; rerun the same PR job for warm-cache
-  comparisons instead of assuming branch dispatch can read them.
-- Windows uses `-maxcpucount:4`. This increases scheduling concurrency, not CPU
-  capacity; it does not guarantee a speedup or fixed batches of target frameworks.
-
-For solution-wide build checks, rather than app runtime validation:
-
-```powershell
-dotnet workload restore MauiDemos.slnx
-dotnet build MauiDemos.slnx --configuration Debug
-```
-
-CI prints MSBuild performance summaries and uploads solution build binlogs as
-`binlogs-<os>-attempt-<number>`, including failures, with seven-day retention.
-Inspect downloaded logs with the pinned local tool:
-
-```powershell
-dotnet tool restore
-dotnet tool run binlogtool -- search <path-to-build.binlog> '$task'
-```
-
-Task durations can overlap; cumulative timings are not wall-clock totals.
-`ProjectImports=None` excludes imported file contents, not imports themselves.
-Binlogs still contain properties and environment values; review before sharing.
+- Read `.github/workflows/maui.yml`, `global.json`, and the project files for
+  current configuration. Do not duplicate their versions, flags, or matrix here.
+- The host-specific target split is intentional for the platform-drift demo,
+  not a limitation of the toolchain. A local build does not validate other hosts.
+  Fix platform implementations rather than removing failing targets.
+- When changing SDK versions, check the required Android packages and Xcode
+  compatibility together.
+- Measure cache download, extraction, and upload overhead before calling it an
+  optimization. Compare runs with compatible cache scopes and account for runner
+  variability. Cache task-owned installations, not shared runner directories.
+- Use CI binlogs and the local `binlogtool` for slow-build investigations.
+  Task durations can overlap; cumulative timings are not wall-clock totals.
+  Binlogs may contain properties and environment values even without embedded
+  imports; review them before sharing.
 
 ## MAUI DevFlow and Inspector
 

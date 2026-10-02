@@ -64,15 +64,13 @@ dotnet run `
 #### Android
 
 Start the selected emulator or connect the device first. Set `$device` to its
-discovered serial, such as `emulator-5554`, before running. The minimum API
-override satisfies the .NET 11 SDK without editing the template project.
+discovered serial, such as `emulator-5554`, before running.
 
 ```powershell
 dotnet run `
     --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
     --framework net11.0-android `
     --property:TargetFrameworks=net11.0-android `
-    --property:SupportedOSPlatformVersion=24.0 `
     --device $device `
     --no-launch-profile
 ```
@@ -137,9 +135,6 @@ dotnet run `
   process lifetimes, and Inspector connections are independent.
 - Distinguish a warm return from a cold restart: bringing an app to the
   foreground should not force-stop it unless the user asks for a restart.
-- The installed .NET 11 Android SDK may require a minimum API of 24. Prefer
-  the command-line override above for local validation; change the project's
-  Android minimum only when that is part of the requested implementation.
 - Prefer `dotnet run` for build-and-run testing. If directly installing a
   generated APK instead, build with `EmbedAssembliesIntoApk=true`; a standalone
   APK must not depend on fast-deployed managed assemblies.

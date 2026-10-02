@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="640" viewBox="0 0 1220 640" role="img" aria-labelledby="title description">
+  <title id="title">Three-frame submarine-to-rocket wireframe</title>
+  <desc id="description">Frame one: tap the submarine image. Frame two: the submarine moves diagonally down-left offscreen. Frame three: the rocket enters from the bottom-left and moves up-right into the original image position. The welcome text and counter stay in place.</desc>
+  <defs>
+    <style>
+      text { font-family: "IBM Plex Sans", "Segoe UI", sans-serif; fill: #30383d; }
+      .heading { font-size: 24px; font-weight: 600; }
+      .caption { font-size: 20px; }
+      .hint { font-size: 16px; fill: #677177; }
+      .motion { fill: none; stroke: #48666c; stroke-width: 3; stroke-linecap: round; marker-end: url(#arrow); }
+      .ghost { opacity: .2; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#48666c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <g id="screen">
+      <rect width="280" height="350" rx="14" fill="#ffffff" stroke="#30383d" stroke-width="2.5"/>
+      <path d="M112 16 H168" stroke="#a1aaad" stroke-width="3" stroke-linecap="round"/>
+      <text x="140" y="202" text-anchor="middle" font-size="23" font-weight="600">Hello, World!</text>
+      <text x="140" y="229" text-anchor="middle" font-size="15" fill="#677177">Welcome to .NET MAUI</text>
+      <rect x="88" y="273" width="104" height="37" rx="7" fill="#f5f6f6" stroke="#677177" stroke-width="1.5"/>
+      <text x="140" y="298" text-anchor="middle" font-size="16">Click me</text>
+    </g>
+    <g id="submarine" fill="#ffffff" stroke="#30383d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M54 -11 L73 -21 V21 L54 11" fill="#f5f6f6"/>
+      <path d="M-16 -20 V-35 H16 V-20" fill="#f5f6f6"/>
+      <path d="M0 -35 V-47 H15"/>
+      <ellipse rx="58" ry="23"/>
+      <circle cx="-28" cy="0" r="9"/>
+      <circle cx="0" cy="0" r="9"/>
+      <circle cx="28" cy="0" r="9"/>
+    </g>
+    <g id="rocket" fill="#ffffff" stroke="#30383d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-17 4 L-35 28 L-16 23 M17 4 L35 28 L16 23" fill="#f5f6f6"/>
+      <path d="M0 -48 C-24 -27 -23 6 -15 26 H15 C23 6 24 -27 0 -48 Z"/>
+      <circle cx="0" cy="-10" r="9"/>
+      <path d="M-10 32 L-5 45 L0 39 L7 55 L11 32" fill="#f5f6f6"/>
+    </g>
+  </defs>
+  <rect width="1220" height="640" fill="#ffffff"/>
+  <path d="M410 54 V604 M810 54 V604" stroke="#e0e4e5" stroke-width="1" stroke-dasharray="5 8"/>
+  <g id="frame-tap">
+    <text class="heading" x="218" y="65" text-anchor="middle">1. Tap</text>
+    <use href="#screen" x="78" y="130"/>
+    <use href="#submarine" transform="translate(218 230)"/>
+    <g transform="translate(234 258) scale(.6)" fill="#ffffff" stroke="#30383d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 20 V-25 C0 -35 14 -35 14 -25 V0 C16 -7 27 -7 28 1 C33 -5 43 -1 44 6 C52 1 61 7 61 16 V31 C61 50 52 65 42 69 H18 C8 62 2 49 -10 32 C-17 23 -6 14 0 20 Z"/>
+      <path d="M7 -47 V-56 M-9 -43 L-16 -50 M23 -43 L30 -50"/>
+    </g>
+    <text class="caption" x="218" y="592" text-anchor="middle">Tap the image</text>
+    <text class="hint" x="218" y="620" text-anchor="middle">The submarine starts here</text>
+  </g>
+  <g id="frame-sub-out">
+    <text class="heading" x="618" y="65" text-anchor="middle">2. Submarine out</text>
+    <use href="#screen" x="478" y="130"/>
+    <use class="ghost" href="#submarine" transform="translate(618 230)"/>
+    <path class="motion" d="M594 267 L440 471"/>
+    <use href="#submarine" transform="translate(400 510)"/>
+    <text class="caption" x="618" y="592" text-anchor="middle">Move down-left, offscreen</text>
+    <text class="hint" x="618" y="620" text-anchor="middle">Keep the text and counter still</text>
+  </g>
+  <g id="frame-rocket-in">
+    <text class="heading" x="1018" y="65" text-anchor="middle">3. Rocket in</text>
+    <use href="#screen" x="878" y="130"/>
+    <use class="ghost" href="#rocket" transform="translate(820 510) rotate(40)"/>
+    <path class="motion" d="M857 473 L985 272"/>
+    <use href="#rocket" transform="translate(1018 230) rotate(40)"/>
+    <text class="caption" x="1018" y="592" text-anchor="middle">Move up-right, into place</text>
+    <text class="hint" x="1018" y="620" text-anchor="middle">Enter from the bottom-left</text>
+  </g>
+</svg>

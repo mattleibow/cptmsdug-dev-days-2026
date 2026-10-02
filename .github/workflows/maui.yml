@@ -1,0 +1,67 @@
+name: MAUI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-26
+          - windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Select Xcode
+        if: runner.os == 'macOS'
+        run: sudo xcode-select --switch /Applications/Xcode_26.6.app/Contents/Developer
+
+      - name: Install MAUI workloads
+        run: dotnet workload restore MauiDemos.slnx --skip-manifest-update
+
+      - name: Install Android SDK dependencies
+        run: >-
+          dotnet build MauiDemos.slnx -t:InstallAndroidDependencies
+          -f net11.0-android
+          -p:TargetFrameworks=net11.0-android
+          -p:AndroidSdkDirectory="$env:ANDROID_HOME"
+          -p:JavaSdkDirectory="$env:JAVA_HOME"
+          -p:AcceptAndroidSDKLicenses=True
+
+      - name: Build solution
+        run: >-
+          dotnet build MauiDemos.slnx --configuration Debug
+          -p:ContinuousIntegrationBuild=true
+          -p:EnableCodeSigning=false
+          -p:AndroidSdkDirectory="$env:ANDROID_HOME"
+          -p:JavaSdkDirectory="$env:JAVA_HOME"

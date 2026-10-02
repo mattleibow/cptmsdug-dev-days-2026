@@ -35,13 +35,27 @@ Build only the project you choose. For Android, iOS, or Mac Catalyst, use the co
 
 ## Continuous integration
 
-The [MAUI Android workflow](.github/workflows/maui-android.yml) builds both demo
-projects independently on Linux for every push and pull request, and can also be
-run manually. It installs the SDK specified in `global.json`, MAUI Android workload, Java 21,
-and the required Android SDK components. Builds use the Debug configuration to
-include the demos' DevFlow integrations; no emulator or signing secrets are needed.
+The [MAUI workflow](.github/workflows/maui.yml) builds both demo projects through
+`MauiDemos.slnx` for every push and pull request, and can also be run manually.
+Its matrix contains only operating systems. Shared target framework conditions
+in `demos/Directory.Build.props` select Android on Linux, Android/iOS/Mac Catalyst
+on macOS, and all four targets (including Windows) on Windows.
+
+The workflow installs the SDK specified in `global.json`, the solution's MAUI
+workloads, Java 21, and the required Android SDK components. macOS uses Xcode 26.6
+for the RC1 Apple workloads and builds iOS for the host's simulator architecture.
+Apple targets on Windows provide compilation coverage, not runnable app bundles;
+native Apple builds run on macOS. Debug builds include the demos' DevFlow
+integrations; no running emulator or signing secrets are needed.
 For prerelease versions, `setup-dotnet` installs the exact SDK from `global.json`;
 roll-forward applies when a newer compatible SDK is already installed.
+
+To build both demos for the current operating system:
+
+```powershell
+dotnet workload restore MauiDemos.slnx
+dotnet build MauiDemos.slnx --configuration Debug
+```
 
 ## Windows tooling
 

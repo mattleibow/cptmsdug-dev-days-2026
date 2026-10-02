@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/demos/">
+    <Project Path="demos/MauiBlazorDemo/MauiBlazorDemo.csproj" />
+    <Project Path="demos/MauiXamlDemo/MauiXamlDemo.csproj" />
+  </Folder>
+</Solution>

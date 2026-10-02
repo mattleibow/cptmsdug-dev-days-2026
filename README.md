@@ -36,7 +36,8 @@ Build only the project you choose. For Android, iOS, or Mac Catalyst, use the co
 ## Continuous integration
 
 The [MAUI workflow](.github/workflows/maui.yml) builds both demo projects through
-`MauiDemos.slnx` for every push and pull request, and can also be run manually.
+`MauiDemos.slnx` for pushes to `main` and pull requests targeting `main`, and can
+also be run manually.
 Its matrix contains only operating systems. Shared target framework conditions
 in `demos/Directory.Build.props` select Android on Linux, Android/iOS/Mac Catalyst
 on macOS, and all four targets (including Windows) on Windows.

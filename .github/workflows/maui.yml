@@ -16,9 +16,6 @@ jobs:
   build:
     name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
-    env:
-      ContinuousIntegrationBuild: 'true'
-      CiTargetFramework: ${{ matrix.framework }}
     strategy:
       fail-fast: false
       matrix:
@@ -26,15 +23,19 @@ jobs:
           - platform: android
             os: ubuntu-latest
             framework: net11.0-android
+            workload: maui-android
           - platform: ios
             os: macos-26
             framework: net11.0-ios
+            workload: maui-ios
           - platform: maccatalyst
             os: macos-26
             framework: net11.0-maccatalyst
+            workload: maui-maccatalyst
           - platform: windows
             os: windows-latest
             framework: net11.0-windows10.0.19041.0
+            workload: maui-windows
     defaults:
       run:
         shell: pwsh
@@ -82,7 +83,7 @@ jobs:
         run: sudo xcode-select --switch /Applications/Xcode_26.6.app/Contents/Developer
 
       - name: Install MAUI workloads
-        run: dotnet workload restore MauiDemos.slnx --skip-manifest-update
+        run: dotnet workload install ${{ matrix.workload }} --skip-manifest-update
 
       - name: Set NuGet cache path
         run: '"NUGET_PACKAGES=$(Join-Path $env:RUNNER_TEMP nuget-packages)" >> $env:GITHUB_ENV'
@@ -99,6 +100,9 @@ jobs:
       - name: Build solution
         run: >-
           dotnet build MauiDemos.slnx --configuration Debug
+          -p:TargetFramework=${{ matrix.framework }}
+          -p:TargetFrameworks=${{ matrix.framework }}
+          -p:ContinuousIntegrationBuild=true
           -p:EnableCodeSigning=false
           ${{ runner.os == 'Windows' && '-maxcpucount:4' || '' }}
           "-bl:artifacts/build.binlog;ProjectImports=None"

@@ -4,17 +4,10 @@ namespace CounterCore;
 
 public sealed class CounterService
 {
-    private const string SettingsResourceName = "CounterCore.counter-settings.json";
-    private static readonly int Step = LoadStep();
+    private const string SettingsResourceName = "CounterCore.Settings.CounterSettings.json";
+    private static readonly int Step;
 
-    public int Count { get; private set; }
-
-    public int Increment()
-    {
-        return Count += Step;
-    }
-
-    private static int LoadStep()
+    static CounterService()
     {
         using var stream = typeof(CounterService).Assembly.GetManifestResourceStream(SettingsResourceName)
             ?? throw new InvalidOperationException($"Missing embedded counter settings: {SettingsResourceName}");
@@ -23,6 +16,13 @@ public sealed class CounterService
         if (step <= 0)
             throw new InvalidDataException("Counter step must be a positive integer.");
 
-        return step;
+        Step = step;
+    }
+
+    public int Count { get; private set; }
+
+    public int Increment()
+    {
+        return Count += Step;
     }
 }

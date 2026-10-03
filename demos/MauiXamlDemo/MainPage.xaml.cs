@@ -11,21 +11,15 @@ public partial class MainPage : ContentPage
 		InitializeComponent();
 	}
 
-	private void OnIncrementClicked(object? sender, EventArgs e)
+	private void OnCounterClicked(object? sender, EventArgs e)
 	{
-		UpdateCount(counter.Increment());
-	}
+		var count = counter.Increment();
 
-	private void OnDecrementClicked(object? sender, EventArgs e)
-	{
-		UpdateCount(counter.Decrement());
-	}
+		if (count == 1)
+			CounterBtn.Text = $"Clicked {count} time";
+		else
+			CounterBtn.Text = $"Clicked {count} times";
 
-	private void UpdateCount(int count)
-	{
-		CountLabel.Text = count.ToString();
-		var description = $"Current count: {count}";
-		SemanticProperties.SetDescription(CountLabel, description);
-		SemanticScreenReader.Announce(description);
+		SemanticScreenReader.Announce(CounterBtn.Text);
 	}
 }

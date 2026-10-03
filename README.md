@@ -12,10 +12,6 @@ Choose **one** as the app you're building; they are alternative starting points,
 > [!NOTE]
 > Both demos reference [`demos/CounterCore`](demos/CounterCore) for their counter implementation.
 
-Both counters start at zero and show the current value beside plus and minus
-controls. Each tap changes the value by one, including below zero. The count
-is kept only while the counter screen is open; it is not saved.
-
 ## Walkthroughs
 
 - [**Build your first canvas**](walkthroughs/first-canvas/README.md) is a 5–10-minute

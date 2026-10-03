@@ -77,16 +77,10 @@ jobs:
         run: >-
           dotnet restore MauiDemos.slnx
           -p:Configuration=Debug
-          -p:TargetFramework=${{ matrix.framework }}
           -p:TargetFrameworks=${{ matrix.framework }}
           -p:ContinuousIntegrationBuild=true
           -p:EnableCodeSigning=false
           "-bl:artifacts/restore.binlog"
-
-      - name: Restore shared library
-        run: >-
-          dotnet restore demos/CounterCore/CounterCore.csproj
-          -p:Configuration=Debug
 
       - name: Build solution
         run: >-

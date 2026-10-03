@@ -4,7 +4,9 @@
 
 - This is a .NET 11 MAUI demo workspace. `demos\MauiXamlDemo` and
   `demos\MauiBlazorDemo` are alternative starting points, not one application.
-  Work only on the project the user chooses.
+  Work only on the app or apps the user requests. Both reference
+  `demos\CounterCore`; change that library when implementing shared behavior,
+  but do not change the other app unless it was requested.
 - Implement only the behavior requested by the user. Do not infer extra
   requirements from unrelated documentation.
 - Keep the README for humans: project choices, demo links, and simple VS Code
@@ -28,7 +30,9 @@
 - Verify the app is responsive and check the actual behavior requested by the
   user. For UI changes, inspect the live tree, properties, and screenshots.
 - If asked to leave the app running, use a persistent terminal or detached
-  process. When restarting, stop only the specific app process.
+  process and confirm it remains responsive. Do not stop its launch shell
+  while the app is still needed. When restarting, stop only the specific
+  app process, never all processes with the same name.
 - After a source change, restart with a fresh `dotnet run` and rediscover the
   agent before inspecting. Do not validate an old process or installed binary.
 - Report launch or runtime failures explicitly. Inspect relevant logs before
@@ -40,14 +44,42 @@ Run from the repository root in PowerShell (`pwsh`). These examples use the
 XAML project; substitute `MauiBlazorDemo` and `MauiBlazorDemo.csproj` when the
 user chooses Blazor. `Join-Path` keeps project paths portable between hosts.
 
+#### Restore before launching
+
+For a clean checkout, a changed dependency manifest, or missing/incompatible
+restore assets, restore the chosen app for its selected platform, then restore
+CounterCore **without** the platform override. The app's `TargetFrameworks`
+override also affects the shared-library restore, but CounterCore builds for
+`net11.0`. The second restore repairs that mismatch, as in CI.
+
+Set `$project` and `$framework` for the chosen app and platform. This example
+selects XAML on Windows; use the target from the appropriate example below.
+
+```powershell
+$project = Join-Path demos MauiXamlDemo MauiXamlDemo.csproj
+$framework = 'net11.0-windows10.0.19041.0'
+dotnet restore $project -p:Configuration=Debug "-p:TargetFrameworks=$framework"
+if ($LASTEXITCODE -ne 0) { throw 'App restore failed.' }
+dotnet restore (Join-Path demos CounterCore CounterCore.csproj) -p:Configuration=Debug
+if ($LASTEXITCODE -ne 0) { throw 'CounterCore restore failed.' }
+```
+
+Once both restores succeed, use `--no-restore` in the launch commands below.
+They still build the current source; `--no-restore` is not `--no-build`.
+Do not rerun the app's platform-scoped restore after restoring CounterCore
+without also repeating the CounterCore restore. Do not install workloads or
+change SDK/package versions merely because of this asset mismatch.
+
 #### Windows
 
 ```powershell
 dotnet run `
     --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --configuration Debug `
     --framework net11.0-windows10.0.19041.0 `
     --property:TargetFrameworks=net11.0-windows10.0.19041.0 `
-    --no-launch-profile
+    --no-launch-profile `
+    --no-restore
 ```
 
 #### macOS (Mac Catalyst)
@@ -57,37 +89,46 @@ Run on a Mac with Xcode installed.
 ```powershell
 dotnet run `
     --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --configuration Debug `
     --framework net11.0-maccatalyst `
     --property:TargetFrameworks=net11.0-maccatalyst `
-    --no-launch-profile
+    --no-launch-profile `
+    --no-restore
 ```
 
 #### Android
 
-Start the selected emulator or connect the device first. Set `$device` to its
-discovered serial, such as `emulator-5554`, before running.
+Start the selected emulator or connect the device first. Discover devices with
+the Mobile Device tools or `dotnet run --list-devices` for the chosen project
+and framework. Set `$device` to the selected native serial before running.
 
 ```powershell
 dotnet run `
     --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --configuration Debug `
     --framework net11.0-android `
     --property:TargetFrameworks=net11.0-android `
     --device $device `
-    --no-launch-profile
+    --no-launch-profile `
+    --no-restore
 ```
 
 #### iOS
 
-Run on a Mac with Xcode installed. Set `$device` to the selected simulator's
-UDID before running; physical devices additionally require provisioning.
+Run on a Mac with Xcode installed. Discover devices with the Mobile Device
+tools or `dotnet run --list-devices` for the chosen project and framework.
+Set `$device` to the selected native device/simulator UDID before running;
+physical devices additionally require provisioning.
 
 ```powershell
 dotnet run `
     --project (Join-Path demos MauiXamlDemo MauiXamlDemo.csproj) `
+    --configuration Debug `
     --framework net11.0-ios `
     --property:TargetFrameworks=net11.0-ios `
     --device $device `
-    --no-launch-profile
+    --no-launch-profile `
+    --no-restore
 ```
 
 ## CI and build troubleshooting
@@ -106,10 +147,9 @@ dotnet run `
   Task durations can overlap; cumulative timings are not wall-clock totals.
   Binlogs may contain properties and environment values even without embedded
   imports; review them before sharing.
-- If scoped Windows auto-restore causes CounterCore NETSDK1005 for `net11.0`,
-  restore the CounterCore project separately, then use a fresh `dotnet run`
-  with `--no-restore`. Do not use `--no-build` or change project targets to
-  hide the restore issue.
+- For CounterCore NETSDK1005 after a platform-scoped restore, use the restore
+  order above. Do not remove the shared reference or change its target to hide
+  the error. This is not evidence of a missing platform workload.
 
 ## MAUI DevFlow CLI
 
@@ -126,7 +166,8 @@ dotnet run `
   The Blazor app also registers `Microsoft.Maui.DevFlow.Blazor` for WebView
   inspection. Release builds do not include these agents.
 - The matching `Microsoft.Maui.Cli` is pinned in the repository's local
-  `dotnet-tools.json` manifest. Use the local tool, not a global installation.
+  root `dotnet-tools.json` manifest. Use `dotnet tool run maui --` from the
+  repository root, not a global installation.
   Restore it with `dotnet tool restore` if it is unavailable.
 - Use the broker for agent discovery. Start it when needed:
 
@@ -135,6 +176,10 @@ dotnet run `
   dotnet tool run maui -- devflow list
   ```
 
+- After launching, wait for the agent with `devflow wait --timeout 60` before
+  inspecting it. If a project-filtered wait times out but `list` shows the app,
+  verify that agent directly with `agent status`; do not repeatedly rebuild
+  or restart the broker. Inspect timeout/error output, not only exit codes.
 - Discover the current agent port; never assume 9223 or reuse stale element
   IDs after an app restart. Confirm the app and platform with `devflow agent
   status -ap <port>`. Pass the discovered port with `-ap`:
@@ -153,14 +198,14 @@ dotnet run `
 
 ### Known CLI issues and workarounds
 
-- [dotnet/maui-labs#621](https://github.com/dotnet/maui-labs/issues/621):
+- [dotnet/maui-labs#620](https://github.com/dotnet/maui-labs/issues/620):
   separate CLI processes can report "Another DevFlow session is driving this
   app" even when commands run sequentially and the previous process exited.
   Run multi-step actions and readbacks through one `devflow batch -ap <port>`
   process to keep the same mutation-lease identity. Plan the sequence first
   or keep batch stdin open; do not start a new process for every step.
   Do not repeatedly retry with more one-shot commands or tiny sleeps.
-- [dotnet/maui-labs#620](https://github.com/dotnet/maui-labs/issues/620):
+- [dotnet/maui-labs#621](https://github.com/dotnet/maui-labs/issues/621):
   the pinned CLI's Blazor snapshot, DOM selector, and click helpers can return
   `Error: Uncaught` because generated JavaScript references an undefined
   `webview` variable. Use `webview source` for HTML inspection and
@@ -175,7 +220,9 @@ dotnet run `
 - The Blazor project's Windows Debug build has a temporary workaround for
   [dotnet/maui-labs#66](https://github.com/dotnet/maui-labs/issues/66).
   Its project target copies the restored bridge's `chobitsu.js` into the
-  package's expected PRI path. Do not duplicate this workaround in the XAML app.
+  package's expected PRI path. Although the upstream issue is closed, do not
+  remove the target until the pinned package is verified to include the fix.
+  Do not duplicate this workaround in the XAML app.
 
 ## DevFlow Inspector
 
@@ -183,7 +230,8 @@ dotnet run `
   app's DevFlow agent through the broker; CLI helper bugs do not by themselves
   establish an Inspector bug.
 - When the user wants the Inspector, start the broker if needed and open
-  `http://localhost:19223/inspector/` in a browser canvas. Select the intended
+  `http://localhost:19223/inspector/` in a browser canvas (19223 is the default;
+  use the port from `devflow broker status` if different). Select the intended
   app and platform, and reselect the fresh agent after an app restart.
 - Use the Inspector's live tree, properties, and screenshots to inspect the
   app. Property edits affect only the running instance, not source files;

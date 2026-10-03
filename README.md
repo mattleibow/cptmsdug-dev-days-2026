@@ -10,7 +10,8 @@ This repository is a .NET 11 MAUI app workspace. Pick a UI stack and build the a
 Choose **one** as the app you're building; they are alternative starting points, not two halves of one solution.
 
 > [!NOTE]
-> Both demos reference [`demos/CounterCore`](demos/CounterCore) for their counter implementation.
+> Both demos reference [`demos/CounterCore`](demos/CounterCore) for their increment-only counter.
+> Its packaged [`countersettings.json`](demos/CounterCore/countersettings.json) sets the increment step to 1.
 > The shared library targets the same host-supported platforms as the apps.
 
 Both demos provide a counter stepper with plus and minus controls. It starts at

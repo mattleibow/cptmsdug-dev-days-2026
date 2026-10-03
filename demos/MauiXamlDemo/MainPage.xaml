@@ -3,54 +3,62 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MauiXamlDemo.MainPage">
 
-    <VerticalStackLayout
-        Padding="30"
-        Spacing="25"
-        VerticalOptions="Center">
-        <Label
-            Text="Counter"
-            Style="{StaticResource Headline}"
-            HorizontalTextAlignment="Center"
-            SemanticProperties.HeadingLevel="Level1" />
-
-        <Label
-            Text="Current count"
-            HorizontalTextAlignment="Center" />
-
-        <Grid ColumnDefinitions="Auto,*,Auto"
-              ColumnSpacing="16"
-              HorizontalOptions="Center"
-              MinimumWidthRequest="260">
-            <Button
-                x:Name="MinusButton"
-                AutomationId="MinusButton"
-                Grid.Column="0"
-                Text="−"
-                FontSize="28"
-                MinimumWidthRequest="64"
-                SemanticProperties.Description="Minus, decrease count by one"
-                Clicked="OnMinusClicked" />
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="30,0"
+            Spacing="25">
+            <Image
+                Source="dotnet_bot.png"
+                HeightRequest="185"
+                Aspect="AspectFit"
+                SemanticProperties.Description="dot net bot in a submarine number ten" />
 
             <Label
-                x:Name="CountLabel"
-                AutomationId="CountLabel"
-                Grid.Column="1"
-                Text="0"
-                FontSize="48"
-                HorizontalTextAlignment="Center"
-                VerticalTextAlignment="Center"
-                SemanticProperties.Description="Current count: 0" />
+                Text="Hello, World!"
+                Style="{StaticResource Headline}"
+                SemanticProperties.HeadingLevel="Level1" />
 
-            <Button
-                x:Name="PlusButton"
-                AutomationId="PlusButton"
-                Grid.Column="2"
-                Text="+"
-                FontSize="28"
-                MinimumWidthRequest="64"
-                SemanticProperties.Description="Plus, increase count by one"
-                Clicked="OnPlusClicked" />
-        </Grid>
-    </VerticalStackLayout>
+            <Label
+                Text="Welcome to &#10;.NET Multi-platform App UI"
+                Style="{StaticResource SubHeadline}"
+                SemanticProperties.HeadingLevel="Level2"
+                SemanticProperties.Description="Welcome to dot net Multi platform App U I" />
+
+            <Grid ColumnDefinitions="Auto,Auto,Auto"
+                  ColumnSpacing="16"
+                  HorizontalOptions="Center">
+                <Button
+                    x:Name="MinusButton"
+                    AutomationId="MinusButton"
+                    Grid.Column="0"
+                    Text="−"
+                    FontSize="24"
+                    MinimumWidthRequest="56"
+                    SemanticProperties.Description="Minus, decrease count by one"
+                    Clicked="OnMinusClicked" />
+
+                <Label
+                    x:Name="CountLabel"
+                    AutomationId="CountLabel"
+                    Grid.Column="1"
+                    Text="0"
+                    FontSize="36"
+                    MinimumWidthRequest="48"
+                    HorizontalTextAlignment="Center"
+                    VerticalTextAlignment="Center"
+                    SemanticProperties.Description="Current count: 0" />
+
+                <Button
+                    x:Name="PlusButton"
+                    AutomationId="PlusButton"
+                    Grid.Column="2"
+                    Text="+"
+                    FontSize="24"
+                    MinimumWidthRequest="56"
+                    SemanticProperties.Description="Plus, increase count by one"
+                    Clicked="OnPlusClicked" />
+            </Grid>
+        </VerticalStackLayout>
+    </ScrollView>
 
 </ContentPage>

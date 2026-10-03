@@ -8,7 +8,9 @@ This repository is a .NET 11 MAUI app workspace. Pick a UI stack and build the a
 - [`demos/MauiBlazorDemo`](demos/MauiBlazorDemo) — Blazor UI hosted in a MAUI app.
 
 Choose **one** as the app you're building; they are alternative starting points, not two halves of one solution.
-Both demos reference [`demos/CounterCore`](demos/CounterCore) for their counter implementation.
+
+> [!NOTE]
+> Both demos reference [`demos/CounterCore`](demos/CounterCore) for their counter implementation.
 
 ## Walkthroughs
 

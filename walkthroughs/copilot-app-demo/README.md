@@ -5,11 +5,10 @@ bi-directional stepper through coordinated sessions. The existing [PR #13][pr]
 goes through review, conflict resolution, CI repair, and merge. Start the
 issue track, switch to the PR while its agents work, then return to the issue.
 
-Open this repository in the GitHub Copilot app. Keep [issue #8][issue] open
-without the later comment until the child sessions are working. Use the
-app's **My work** view to find the issue and PR. Outcomes depend on the live
-state: read the current checks and merge status rather than assuming that a
-previous result still applies.
+Open this repository in the GitHub Copilot app. Use the app's **My work**
+view to find the issue and PR. Outcomes depend on the live state: read
+the current checks and merge status rather than assuming that a previous
+result still applies.
 
 ## 1. Schedule a short repo pulse
 
@@ -52,23 +51,16 @@ should receive the later no-negative requirement yet.
 
 ### 3. Change the requirement while they work
 
-When both children are implementing the stepper, use the **issue UI** to
-add this comment:
+When both children are implementing the stepper, return to the coordinator
+session and send:
 
 ```text
-Change of requirement: don't let it go negative. At zero, pressing minus
-should leave the value at zero.
+Don't let it go negative.
 ```
 
-Then return to the coordinator session and send:
-
-```text
-Check the issue for updates.
-```
-
-**Expected:** The coordinator reads the new comment and relays it to both
-children. Check their responses. Issue comments are not automatically
-watched by the sessions; the second prompt is what asks for an update.
+**Expected:** The coordinator relays the new requirement to both children.
+Check their responses. The issue is unchanged; the mid-flight requirement
+comes directly from this message, not an issue comment.
 
 While they work, switch to Track B. Return to step 5 after the PR is ready.
 
@@ -133,8 +125,8 @@ Open a PR for each.
 ```
 
 **Expected:** The two children open separate PRs for their app changes.
-Inspect each diff in the app and confirm both account for the issue
-comment. Review the current checks and enable Agent Merge on each PR if
+Inspect each diff in the app and confirm both account for the mid-flight
+request. Review the current checks and enable Agent Merge on each PR if
 you want it to handle review comments, CI failures, or integration
 conflicts. One PR landing can make the other's shared-code changes need
 reconciliation; that is a possibility, not a guaranteed conflict.

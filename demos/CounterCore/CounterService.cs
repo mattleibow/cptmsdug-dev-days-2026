@@ -11,6 +11,9 @@ public sealed class CounterService
 
     public int Decrement()
     {
-        return --Count;
+        if (Count > 0)
+            --Count;
+
+        return Count;
     }
 }

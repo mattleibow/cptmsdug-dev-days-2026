@@ -14,7 +14,8 @@ Choose **one** as the app you're building; they are alternative starting points,
 > The shared library targets the same host-supported platforms as the apps.
 
 Both demos provide a counter stepper with plus and minus controls. It starts at
-zero, allows negative values, and keeps the count in memory without saving it.
+zero, stays at zero when minus is pressed at zero, and keeps the count in memory
+without saving it.
 
 ## Walkthroughs
 

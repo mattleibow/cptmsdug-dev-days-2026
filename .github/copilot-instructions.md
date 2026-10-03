@@ -106,14 +106,22 @@ dotnet run `
   Task durations can overlap; cumulative timings are not wall-clock totals.
   Binlogs may contain properties and environment values even without embedded
   imports; review them before sharing.
+- If scoped Windows auto-restore causes CounterCore NETSDK1005 for `net11.0`,
+  restore the CounterCore project separately, then use a fresh `dotnet run`
+  with `--no-restore`. Do not use `--no-build` or change project targets to
+  hide the restore issue.
 
-## MAUI DevFlow and Inspector
+## MAUI DevFlow CLI
 
-- Read `.github/skills/maui-devflow-debug/SKILL.md` before runtime inspection.
-  Its repository demo workflow and `references/batch.md` contain tested
-  workarounds for the pinned CLI. Use them before starting a demo.
-  `devflow skills doctor` can report these intentional adaptations as drift;
-  do not overwrite them with `init`, `skills update`, or `--force`.
+- Use `maui-devflow-debug` for launch, discovery, inspection, and interaction;
+  `maui-devflow-onboard` for missing package references or registration; and
+  `maui-devflow-session-review` when the user requests a review of tooling
+  friction. These skills live in `.github/skills`. If the current session
+  cannot invoke one, read its `SKILL.md` directly.
+- Keep the bundled skills unchanged. Repository-specific issues and
+  workarounds belong in these instructions, not in the skill files.
+  Confirm syntax with CLI help: the bundled batch reference has legacy
+  `MAUI`/`cdp` examples, while the current commands use `ui`/`webview`.
 - Both apps register `Microsoft.Maui.DevFlow.Agent` in Debug builds only.
   The Blazor app also registers `Microsoft.Maui.DevFlow.Blazor` for WebView
   inspection. Release builds do not include these agents.
@@ -127,10 +135,9 @@ dotnet run `
   dotnet tool run maui -- devflow list
   ```
 
-- Open `http://localhost:19223/inspector/` in a browser canvas when the user
-  wants to inspect the app. Select the agent for the intended app and platform.
 - Discover the current agent port; never assume 9223 or reuse stale element
-  IDs after an app restart. Pass the discovered port with `-ap`:
+  IDs after an app restart. Confirm the app and platform with `devflow agent
+  status -ap <port>`. Pass the discovered port with `-ap`:
 
   ```powershell
   dotnet tool run maui -- devflow ui tree -ap <port>
@@ -143,14 +150,47 @@ dotnet run `
   temporary edits after the requested test.
 - If the UI changes during a tree capture, retry after it settles.
   Do not interpret a failed tree capture as a successful check.
-- If scoped Windows auto-restore causes CounterCore NETSDK1005 for `net11.0`,
-  restore the CounterCore project separately, then use a fresh `dotnet run`
-  with `--no-restore`. Do not use `--no-build` or change project targets to
-  hide the restore issue.
+
+### Known CLI issues and workarounds
+
+- [dotnet/maui-labs#621](https://github.com/dotnet/maui-labs/issues/621):
+  separate CLI processes can report "Another DevFlow session is driving this
+  app" even when commands run sequentially and the previous process exited.
+  Run multi-step actions and readbacks through one `devflow batch -ap <port>`
+  process to keep the same mutation-lease identity. Plan the sequence first
+  or keep batch stdin open; do not start a new process for every step.
+  Do not repeatedly retry with more one-shot commands or tiny sleeps.
+- [dotnet/maui-labs#620](https://github.com/dotnet/maui-labs/issues/620):
+  the pinned CLI's Blazor snapshot, DOM selector, and click helpers can return
+  `Error: Uncaught` because generated JavaScript references an undefined
+  `webview` variable. Use `webview source` for HTML inspection and
+  `webview Runtime evaluate` for DOM queries and the identified element's
+  `.click()` instead of `webview Input dispatchClickEvent`. Keep evaluations
+  in the same batch and read the displayed value after each click.
+  Never assign component state or DOM text to simulate an interaction.
+- Inspect output as well as process and batch exit codes: the WebView helper
+  failures above can return exit code 0. An error or failed readback is not
+  a pass. Use the known workarounds rather than repeatedly reproducing the
+  failures during a demo; revalidate them after upgrading the CLI.
 - The Blazor project's Windows Debug build has a temporary workaround for
   [dotnet/maui-labs#66](https://github.com/dotnet/maui-labs/issues/66).
   Its project target copies the restored bridge's `chobitsu.js` into the
   package's expected PRI path. Do not duplicate this workaround in the XAML app.
+
+## DevFlow Inspector
+
+- The Inspector is the browser UI, not the CLI. It connects to the running
+  app's DevFlow agent through the broker; CLI helper bugs do not by themselves
+  establish an Inspector bug.
+- When the user wants the Inspector, start the broker if needed and open
+  `http://localhost:19223/inspector/` in a browser canvas. Select the intended
+  app and platform, and reselect the fresh agent after an app restart.
+- Use the Inspector's live tree, properties, and screenshots to inspect the
+  app. Property edits affect only the running instance, not source files;
+  restore temporary edits after the requested inspection.
+- Avoid driving the same app simultaneously through the Inspector and CLI.
+  Finish or disconnect the active driver before switching tools; do not
+  treat a competing driver's mutation lease as an app failure.
 
 ## Mobile Device canvas and Android
 

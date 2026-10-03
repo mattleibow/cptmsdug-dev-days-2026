@@ -2,7 +2,6 @@
 
 ## Table of Contents
 - [Machine-readable output and error envelope](#machine-readable-output-and-error-envelope)
-- [Known pinned CLI issues](#known-pinned-cli-issues)
 - [Connection Refused](#connection-refused--cannot-connect)
 - [Android UI Thread Exceptions](#android-ui-thread-exceptions)
 - [Build Failures](#build-failures)
@@ -35,41 +34,6 @@ The full `--json` error envelope contract (schema, code categories, worked examp
 Optional fields (`remediation`, `context`, `native_error`, `docs_url`, `correlation_id`) are **omitted entirely** when null.
 When `remediation.type` is `autofixable`, run `remediation.command` then retry the original command.
 When `remediation` is absent, surface `message` and stop retrying.
-
-## Known pinned CLI issues
-
-These workarounds were reproduced on Windows with CLI/agent
-`0.1.0-preview.12.26421.1` (revision
-`78e85a5cb9c7a3efaaacf85d6176ce971f40b7d6`). Use them from the start of a demo,
-not after repeatedly hitting the known failures. Revalidate after upgrading.
-
-### Blazor helpers return `Error: Uncaught`
-
-Query, snapshot, and click helpers generate JavaScript referencing an
-undefined `webview` variable. CDP can be healthy while these helpers fail.
-Some failures return exit code 0, including batch command responses.
-
-Use `webview source` for HTML inspection and `webview Runtime evaluate` for
-DOM queries, the identified element's `.click()`, and displayed-value reads.
-Keep all evaluations in one batch, and reject error text or failed predicates
-even when the exit code is 0. See `batch.md` for tested examples and
-[dotnet/maui-labs#620](https://github.com/dotnet/maui-labs/issues/620)
-for the reproduction. Do not change app code or reinject Chobitsu for this
-known helper bug.
-
-### Sequential CLI commands report another driver
-
-Each CLI process has a new mutation-lease identity. A previous one-shot
-process can retain ownership after exiting, including after read-only
-JavaScript evaluation. Repeatedly starting CLI processes or adding tiny sleeps
-does not provide a reliable ownership handoff.
-
-Use one batch process for the whole workflow. If an existing process still
-owns the lease, finish or stop only that known driver; do not take over an
-unrelated Inspector/client or restart all apps/brokers. If a terminated
-driver's lease still blocks progress, let it expire and retry once, or restart
-only your test app and rediscover its agent. Do not assume an expiry interval.
-See [dotnet/maui-labs#621](https://github.com/dotnet/maui-labs/issues/621).
 
 ## Connection Refused / Cannot Connect
 

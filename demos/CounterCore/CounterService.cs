@@ -8,4 +8,9 @@ public sealed class CounterService
     {
         return ++Count;
     }
+
+    public int Decrement()
+    {
+        return --Count;
+    }
 }

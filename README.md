@@ -13,6 +13,9 @@ Choose **one** as the app you're building; they are alternative starting points,
 > Both demos reference [`demos/CounterCore`](demos/CounterCore) for their counter implementation.
 > The shared library targets the same host-supported platforms as the apps.
 
+Both demos provide a counter stepper with plus and minus controls. It starts at
+zero, allows negative values, and keeps the count in memory without saving it.
+
 ## Walkthroughs
 
 - [**Build your first canvas**](walkthroughs/first-canvas/README.md) is a 5–10-minute
@@ -22,7 +25,7 @@ Choose **one** as the app you're building; they are alternative starting points,
   start from the clean XAML template, build an animation from a shared sketch,
   inspect the running app, and test and record it on Android.
 - [**Copilot App demo**](walkthroughs/copilot-app-demo/README.md) is a draft
-  two-app issue-to-PR walkthrough; its tally features are not implemented yet.
+  two-app issue-to-PR walkthrough, including the counter stepper.
 
 Walkthroughs and their assets live in [`walkthroughs`](walkthroughs/README.md);
 the app projects remain in `demos`.

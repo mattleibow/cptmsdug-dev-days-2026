@@ -109,6 +109,11 @@ dotnet run `
 
 ## MAUI DevFlow and Inspector
 
+- Read `.github/skills/maui-devflow-debug/SKILL.md` before runtime inspection.
+  DevFlow's bundled skills are installed with `devflow init --scope project
+  --target github`; `devflow skills doctor` checks them against the local CLI.
+  Confirm syntax with CLI help: the bundled batch reference has legacy
+  `MAUI`/`cdp` examples, while the current commands use `ui`/`webview`.
 - Both apps register `Microsoft.Maui.DevFlow.Agent` in Debug builds only.
   The Blazor app also registers `Microsoft.Maui.DevFlow.Blazor` for WebView
   inspection. Release builds do not include these agents.
@@ -138,6 +143,20 @@ dotnet run `
   temporary edits after the requested test.
 - If the UI changes during a tree capture, retry after it settles.
   Do not interpret a failed tree capture as a successful check.
+- Run multi-step interactions through one `devflow batch` invocation to retain
+  the same mutation-lease identity. Separate CLI processes can report
+  "Another DevFlow session is driving this app" even for sequential commands.
+  Rediscover the intended agent after restarting; ports can be reassigned.
+- In the pinned CLI, Blazor `webview Input dispatchClickEvent` can report
+  `Error: Uncaught` because its generated script references an undefined
+  `webview` variable. Use `webview Runtime evaluate` to call the identified
+  DOM button's `.click()`, then read the displayed value after every click.
+  Do not substitute assignment to the count or DOM text for interaction.
+  Inspect command output, not only exit codes: this error can return exit 0.
+- If scoped Windows auto-restore causes CounterCore NETSDK1005 for `net11.0`,
+  restore the CounterCore project separately, then use a fresh `dotnet run`
+  with `--no-restore`. Do not use `--no-build` or change project targets to
+  hide the restore issue.
 - The Blazor project's Windows Debug build has a temporary workaround for
   [dotnet/maui-labs#66](https://github.com/dotnet/maui-labs/issues/66).
   Its project target copies the restored bridge's `chobitsu.js` into the

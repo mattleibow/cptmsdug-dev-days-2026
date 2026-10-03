@@ -3,9 +3,13 @@
 
 <h1>Counter</h1>
 
-<p role="status">Current count: @counter.Count</p>
-
-<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+<div class="d-flex align-items-center gap-3 flex-wrap">
+    <button type="button" class="btn btn-primary" aria-label="Decrease count" @onclick="DecrementCount">− Minus</button>
+    <output role="status" aria-live="polite" aria-atomic="true">
+        <span class="fs-5">Current count:</span> <strong class="display-4">@counter.Count</strong>
+    </output>
+    <button type="button" class="btn btn-primary" aria-label="Increase count" @onclick="IncrementCount">+ Plus</button>
+</div>
 
 @code {
     private readonly CounterService counter = new();
@@ -13,5 +17,10 @@
     private void IncrementCount()
     {
         counter.Increment();
+    }
+
+    private void DecrementCount()
+    {
+        counter.Decrement();
     }
 }

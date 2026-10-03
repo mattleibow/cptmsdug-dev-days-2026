@@ -24,12 +24,40 @@
                 SemanticProperties.HeadingLevel="Level2"
                 SemanticProperties.Description="Welcome to dot net Multi platform App U I" />
 
-            <Button
-                x:Name="CounterBtn"
-                Text="Click me"
-                SemanticProperties.Hint="Counts the number of times you click"
-                Clicked="OnCounterClicked"
-                HorizontalOptions="Fill" />
+            <Grid ColumnDefinitions="Auto,Auto,Auto"
+                  ColumnSpacing="16"
+                  HorizontalOptions="Center">
+                <Button
+                    x:Name="MinusButton"
+                    AutomationId="MinusButton"
+                    Grid.Column="0"
+                    Text="−"
+                    FontSize="24"
+                    MinimumWidthRequest="56"
+                    SemanticProperties.Description="Minus, decrease count by one"
+                    Clicked="OnMinusClicked" />
+
+                <Label
+                    x:Name="CountLabel"
+                    AutomationId="CountLabel"
+                    Grid.Column="1"
+                    Text="0"
+                    FontSize="36"
+                    MinimumWidthRequest="48"
+                    HorizontalTextAlignment="Center"
+                    VerticalTextAlignment="Center"
+                    SemanticProperties.Description="Current count: 0" />
+
+                <Button
+                    x:Name="PlusButton"
+                    AutomationId="PlusButton"
+                    Grid.Column="2"
+                    Text="+"
+                    FontSize="24"
+                    MinimumWidthRequest="56"
+                    SemanticProperties.Description="Plus, increase count by one"
+                    Clicked="OnPlusClicked" />
+            </Grid>
         </VerticalStackLayout>
     </ScrollView>
 

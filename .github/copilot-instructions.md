@@ -21,7 +21,10 @@
   host. For local runtime testing, do not attempt Apple targets on Windows or
   Windows targets on macOS.
 - Restrict `TargetFrameworks` to the selected target so unrelated platform
-  workloads are not required. Use Debug for live inspection.
+  workloads are not required. Both apps and CounterCore use matching
+  host-supported platform targets, so restore/build/run the selected app or
+  solution normally; no separate shared-library restore is needed.
+  Use Debug for live inspection.
 - For Android and iOS, discover available devices first and set `$device` to
   the selected native serial or UDID. Pass it with `--device` instead of leaving
   an unattended command waiting at .NET 11's interactive device picker.
@@ -44,32 +47,6 @@ Run from the repository root in PowerShell (`pwsh`). These examples use the
 XAML project; substitute `MauiBlazorDemo` and `MauiBlazorDemo.csproj` when the
 user chooses Blazor. `Join-Path` keeps project paths portable between hosts.
 
-#### Restore before launching
-
-For a clean checkout, a changed dependency manifest, or missing/incompatible
-restore assets, restore the chosen app for its selected platform, then restore
-CounterCore **without** the platform override. The app's `TargetFrameworks`
-override also affects the shared-library restore, but CounterCore builds for
-`net11.0`. The second restore repairs that mismatch, as in CI.
-
-Set `$project` and `$framework` for the chosen app and platform. This example
-selects XAML on Windows; use the target from the appropriate example below.
-
-```powershell
-$project = Join-Path demos MauiXamlDemo MauiXamlDemo.csproj
-$framework = 'net11.0-windows10.0.19041.0'
-dotnet restore $project -p:Configuration=Debug "-p:TargetFrameworks=$framework"
-if ($LASTEXITCODE -ne 0) { throw 'App restore failed.' }
-dotnet restore (Join-Path demos CounterCore CounterCore.csproj) -p:Configuration=Debug
-if ($LASTEXITCODE -ne 0) { throw 'CounterCore restore failed.' }
-```
-
-Once both restores succeed, use `--no-restore` in the launch commands below.
-They still build the current source; `--no-restore` is not `--no-build`.
-Do not rerun the app's platform-scoped restore after restoring CounterCore
-without also repeating the CounterCore restore. Do not install workloads or
-change SDK/package versions merely because of this asset mismatch.
-
 #### Windows
 
 ```powershell
@@ -78,8 +55,7 @@ dotnet run `
     --configuration Debug `
     --framework net11.0-windows10.0.19041.0 `
     --property:TargetFrameworks=net11.0-windows10.0.19041.0 `
-    --no-launch-profile `
-    --no-restore
+    --no-launch-profile
 ```
 
 #### macOS (Mac Catalyst)
@@ -92,8 +68,7 @@ dotnet run `
     --configuration Debug `
     --framework net11.0-maccatalyst `
     --property:TargetFrameworks=net11.0-maccatalyst `
-    --no-launch-profile `
-    --no-restore
+    --no-launch-profile
 ```
 
 #### Android
@@ -109,8 +84,7 @@ dotnet run `
     --framework net11.0-android `
     --property:TargetFrameworks=net11.0-android `
     --device $device `
-    --no-launch-profile `
-    --no-restore
+    --no-launch-profile
 ```
 
 #### iOS
@@ -127,8 +101,7 @@ dotnet run `
     --framework net11.0-ios `
     --property:TargetFrameworks=net11.0-ios `
     --device $device `
-    --no-launch-profile `
-    --no-restore
+    --no-launch-profile
 ```
 
 ## CI and build troubleshooting
@@ -147,9 +120,6 @@ dotnet run `
   Task durations can overlap; cumulative timings are not wall-clock totals.
   Binlogs may contain properties and environment values even without embedded
   imports; review them before sharing.
-- For CounterCore NETSDK1005 after a platform-scoped restore, use the restore
-  order above. Do not remove the shared reference or change its target to hide
-  the error. This is not evidence of a missing platform workload.
 
 ## MAUI DevFlow CLI
 

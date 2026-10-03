@@ -11,6 +11,7 @@ Choose **one** as the app you're building; they are alternative starting points,
 
 > [!NOTE]
 > Both demos reference [`demos/CounterCore`](demos/CounterCore) for their counter implementation.
+> The shared library targets the same host-supported platforms as the apps.
 
 ## Walkthroughs
 

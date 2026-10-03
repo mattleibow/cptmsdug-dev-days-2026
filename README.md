@@ -8,8 +8,11 @@ This repository is a .NET 11 MAUI app workspace. Pick a UI stack and build the a
 - [`demos/MauiBlazorDemo`](demos/MauiBlazorDemo) — Blazor UI hosted in a MAUI app.
 
 Choose **one** as the app you're building; they are alternative starting points, not two halves of one solution.
-Both demos reference [`demos/CounterCore`](demos/CounterCore) for their increment-only counter.
-Its packaged [`countersettings.json`](demos/CounterCore/countersettings.json) sets the increment step to 1.
+
+> [!NOTE]
+> Both demos reference [`demos/CounterCore`](demos/CounterCore) for their increment-only counter.
+> Its packaged [`countersettings.json`](demos/CounterCore/countersettings.json) sets the increment step to 1.
+> The shared library targets the same host-supported platforms as the apps.
 
 ## Walkthroughs
 
@@ -19,6 +22,8 @@ Its packaged [`countersettings.json`](demos/CounterCore/countersettings.json) se
 - [**Sketch to device**](walkthroughs/sketch-to-device/README.md) is a copy-and-paste demo:
   start from the clean XAML template, build an animation from a shared sketch,
   inspect the running app, and test and record it on Android.
+- [**Copilot App demo**](walkthroughs/copilot-app-demo/README.md) is a draft
+  two-app issue-to-PR walkthrough; its tally features are not implemented yet.
 
 Walkthroughs and their assets live in [`walkthroughs`](walkthroughs/README.md);
 the app projects remain in `demos`.
@@ -42,3 +47,19 @@ Install the .NET 11 RC1 SDK or newer, the MAUI workload for your platform, and t
 
 Android needs the Android SDK and an emulator or connected device.
 iOS and Mac Catalyst need a Mac with Xcode installed.
+
+## Keynote
+
+The current presentation is `slides\keynote.pptx`. Its working artwork and
+reference speaker photos are under `slides\assets`.
+
+Run the read-only package checker with Python 3.10 or newer (no dependencies):
+
+```powershell
+python scripts\validate_pptx.py slides\keynote.pptx
+```
+
+It checks ZIP integrity, XML parsing, content types, relationships, slide
+references and embedded-asset references. It does not perform XSD validation
+or check visual layout, animation timing or video playback; rehearse those in
+PowerPoint Slide Show.

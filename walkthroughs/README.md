@@ -7,6 +7,8 @@ Follow these copy-and-paste guides in a Copilot project session:
 - **[Sketch to device](sketch-to-device/README.md):** start from the clean
   XAML template, build a three-frame animation from a sketch, inspect the app,
   and test and record it on Android.
+- **[Copilot App demo](copilot-app-demo/README.md):** draft an issue-to-PR
+  presentation with two app sessions and a mid-flight requirement change.
 
 Each walkthrough has its own folder with a `README.md` and any supporting
 assets. App projects live separately in [`demos`](../demos).

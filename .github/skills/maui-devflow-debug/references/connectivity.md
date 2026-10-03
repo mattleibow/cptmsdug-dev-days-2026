@@ -41,6 +41,17 @@ Use this when a project already has DevFlow package references and `builder.AddM
    should show the expected app name/platform. A successful `ui tree` means
    connectivity is fixed for UI automation; continue the main debug loop.
 
+   In this repository, prefix commands with `dotnet tool run maui --` and
+   pass the selected agent's freshly discovered port to status and inspection.
+   A project-filtered `wait` timed out in a Windows run even though `list`
+   showed the app and direct `agent status` worked. If that happens, verify
+   the listed agent's identity directly; do not assume the app needs rebuilding.
+   The cause of that filter mismatch was not established.
+
+   Once reachable, use one batch process for interactions. A mutation-lease
+   error is not connection refusal: see `batch.md` and the known CLI issues
+   in `troubleshooting.md` rather than repeatedly restarting the broker.
+
 ## Platform notes
 
 ### Android emulator

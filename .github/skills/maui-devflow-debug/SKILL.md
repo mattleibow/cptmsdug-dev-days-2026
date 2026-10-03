@@ -9,6 +9,43 @@ description: >-
 Use this skill for the active debugging loop after a MAUI app has DevFlow
 packages and `builder.AddMauiDevFlowAgent()` registered.
 
+## Repository demo workflow: read first
+
+These instructions override generic examples below for this repository's
+pinned CLI. They are tested workarounds, not fixes to DevFlow itself.
+
+- Use the repository-local `dotnet tool run maui --`, not a global `maui`.
+  Follow `.github/copilot-instructions.md` for `dotnet run`, target selection,
+  and the CounterCore restore workaround. Keep the launch process alive.
+- Discover the fresh agent with `devflow wait` and `devflow list`, then confirm
+  its app, platform, and process with `devflow agent status -ap <port>`.
+  Never assume a previous port still belongs to the same app. If a
+  project-filtered wait times out but list shows the app, check its status
+  directly instead of rebuilding or restarting the broker.
+- Plan the interaction sequence before starting it. Use **one**
+  `devflow batch -ap <port>` process for all actions and readbacks. Separate
+  sequential CLI processes can conflict over a retained mutation lease
+  ([dotnet/maui-labs#621](https://github.com/dotnet/maui-labs/issues/621)).
+  Read `references/batch.md` before issuing actions, including native taps.
+- For Blazor, verify `webview status`, then use `webview Runtime evaluate`
+  for DOM inspection and the identified element's `.click()`. Do not use
+  `webview snapshot`, `webview DOM querySelector`/`querySelectorAll`, or
+  `webview Input dispatchClickEvent` with the affected pinned CLI. Their
+  generated scripts reference an undefined `webview` variable
+  ([dotnet/maui-labs#620](https://github.com/dotnet/maui-labs/issues/620)).
+  Do not repeatedly reproduce a known tooling failure during the demo.
+- Read the actual displayed value after **every** action. Never assign
+  component state or DOM text to simulate a click. Inspect each batch
+  response's output as well as its exit code; `Error: Uncaught` can be
+  reported with exit code 0. A failed readback is a failure, not a pass.
+- Give each app one runtime driver at a time. Do not open an Inspector or
+  start another CLI action session against an app already being driven.
+  For delegated app work, report the commit, evidence, and any blocker in
+  one completion handoff; an idle notification alone is not completion.
+- Do not overwrite these repository adaptations with `devflow init`,
+  `skills update`, or `--force` during a demo. After a CLI upgrade, compare
+  bundled guidance and retest before removing the workarounds.
+
 ## When to Use
 
 - Build and run a MAUI app on Android, iOS, Mac Catalyst, macOS, Windows, or GTK.
@@ -66,18 +103,21 @@ for MAUI DevFlow product feedback. Do not run it automatically.
    Treat `agent status` as the runtime truth for reachability and app identity.
    `diagnose` is broader environment state; it can report broker/project details
    without proving the current app is reachable.
+   Pass the current discovered port explicitly to inspection commands.
 
    If `wait`, `list`, or `ui tree` cannot connect after the app is running, load `references/connectivity.md` and recover the broker/agent connection before continuing.
 
-6. Prefer AutomationId-first validation for UI flows:
+6. Prefer AutomationId-first validation for native UI flows. Query controls
+   before acting, then execute taps and assertions in the same batch:
 
    ```bash
-   maui devflow ui query --automationId save-button
-   maui devflow ui tap <element-id-from-query>
+   dotnet tool run maui -- devflow ui query --automationId save-button -ap <port>
    ```
 
    If important controls do not have stable `AutomationId`s, add them before
    relying on text, coordinates, screenshots, or brittle tree positions.
+   For Blazor, use the DOM workflow in `references/batch.md`, not native taps
+   on the BlazorWebView container.
 
 7. Inspect, interact, capture evidence, then edit the app and repeat from launch.
 
@@ -89,6 +129,9 @@ for MAUI DevFlow product feedback. Do not run it automatically.
 - Do not reuse a busy simulator/emulator when multiple MAUI apps or agents may be running.
 - Do not debug Blazor WebView DOM issues through the native visual tree alone; use the WebView/CDP commands.
 - Do not drive key app flows by coordinates when AutomationIds are available or can be added.
+- Do not retry lease conflicts by starting more one-shot action processes.
+  Stop the previous driver, preserve one batch process for the workflow, and
+  never take over another live client's lease.
 
 ## Stop Signals
 

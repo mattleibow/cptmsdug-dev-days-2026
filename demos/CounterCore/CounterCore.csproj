@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Settings\CounterSettings.json" />
+    <EmbeddedResource Include="CounterSettings.json" />
   </ItemGroup>
 
 </Project>

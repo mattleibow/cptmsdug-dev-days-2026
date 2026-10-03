@@ -43,36 +43,3 @@ Install the .NET 11 RC1 SDK or newer, the MAUI workload for your platform, and t
 
 Android needs the Android SDK and an emulator or connected device.
 iOS and Mac Catalyst need a Mac with Xcode installed.
-
-## Dev Days talks
-
-This repository also contains the content, source material, and draft decks
-for two Dev Days Cape Town 2026 talks:
-
-1. A **30-minute user-group keynote** that welcomes the event, thanks the
-   community and sponsors, orients attendees, and introduces the broader
-   GitHub Copilot ecosystem.
-2. A **45-minute technical session** that recaps the ecosystem, explains the
-   GitHub Copilot App operating model, and goes deep on Canvas extensions.
-
-Start with the [talk workspace](docs/README.md).
-
-| Talk | Content | Run of show | Build brief |
-|---|---|---|---|
-| Event keynote | [`docs/keynote/content.md`](docs/keynote/content.md) | [`docs/keynote/run-of-show.md`](docs/keynote/run-of-show.md) | [`docs/keynote/build-brief.md`](docs/keynote/build-brief.md) |
-| App and Canvas session | [`docs/canvas-session/content.md`](docs/canvas-session/content.md) | [`docs/canvas-session/run-of-show.md`](docs/canvas-session/run-of-show.md) | [`docs/canvas-session/build-brief.md`](docs/canvas-session/build-brief.md) |
-
-The [Canvas demo plan](docs/canvas-session/demos.md) uses Credit Timeline,
-Mobile Device, the first-canvas walkthrough, and this repository's Sketch to
-app extension. The [source-material index](docs/source-material/README.md)
-preserves the original reference decks, including
-[`Canvassing your Agents.pdf`](docs/source-material/canvassing-your-agents.pdf).
-The [organizer checklist](docs/keynote/organizer-inputs.md) records outstanding
-keynote approvals.
-
-The [keynote wireframe](docs/decks/drafts/copilot-keynote-wireframe.pptx)
-preserves content, speaker notes, and source media, but its visual treatment
-was rejected; it is **not a finished deck**. Its
-[local build script](scripts/presentation/build-keynote-wireframe.mjs) and the
-Markdown plans remain available for a redesign. Do not edit or preview slides
-in the GitHub Copilot App slide Canvas.

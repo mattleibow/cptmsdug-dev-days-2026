@@ -43,3 +43,19 @@ Install the .NET 11 RC1 SDK or newer, the MAUI workload for your platform, and t
 
 Android needs the Android SDK and an emulator or connected device.
 iOS and Mac Catalyst need a Mac with Xcode installed.
+
+## Keynote
+
+The current presentation is `slides\keynote.pptx`. Its working artwork and
+reference speaker photos are under `slides\assets`.
+
+Run the read-only package checker with Python 3.10 or newer (no dependencies):
+
+```powershell
+python scripts\validate_pptx.py slides\keynote.pptx
+```
+
+It checks ZIP integrity, XML parsing, content types, relationships, slide
+references and embedded-asset references. It does not perform XSD validation
+or check visual layout, animation timing or video playback; rehearse those in
+PowerPoint Slide Show.
